@@ -14,7 +14,7 @@ Add this section after `Context` and before `Scope`:
 - Integration consumer: self
 ```
 
-`Journey ID` must match the applicable journey manifest selected relative to the consumer root. Use `none` only for source-only work that does not itself own a registered journey. `Integration consumer` is `self`, an exact work-item ID, or `none` when the source work has no downstream product journey.
+`Journey ID` must match the applicable journey projection selected relative to the consumer root. Use `none` only for source-only work that does not itself own a registered journey. `Integration consumer` is `self`, an exact work-item ID, or `none` when the source work has no downstream product journey.
 
 Integrated and staging work also includes:
 
@@ -73,7 +73,7 @@ Before returning successful archive-gate evidence:
 
 - every checkbox under `Acceptance criteria` and `Verification` is checked;
 - `Result` and `Evidence` contain actual non-placeholder completion text;
-- the manifest's current level reaches the work item's target level;
+- the exact current claim's observed level reaches the work item's target level;
 - the evidence class supports that level;
 - deferred product criteria are removed from the claim and assigned to an explicit integration consumer or dependent item, not hidden in `Follow-ups`.
 

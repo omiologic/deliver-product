@@ -12,7 +12,7 @@ Keep product delivery centered on one observable journey without turning source 
 Choose the smallest applicable operation:
 
 - **Shape** when planning applicable work: name one primary journey, its integration consumer, target evidence level, real boundaries, and prerequisites.
-- **Preflight** before starting integrated or staging work: verify the journey manifest, prerequisites, exact environment inputs, and staging work-in-progress slot.
+- **Preflight** before starting integrated or staging work: verify the journey projection, prerequisites, exact environment inputs, and staging work-in-progress slot.
 - **Impact** after cross-cutting source changes: map changed paths to registered journeys and select only the affected real-journey suites.
 - **Complete** before a successful archive claim: distinguish source, integrated, and staging evidence and run the deterministic archive gate.
 - **Resolve blocker** when a shared-environment preflight, deployment, receipt,
@@ -20,7 +20,7 @@ Choose the smallest applicable operation:
   the first missing producer to an exact work item, record the safe solution,
   human action, and exit evidence, then stop retries until that path changes.
 
-Read [delivery contract](references/delivery-contract.md) for shaping or completion. Read [manifest contract](references/manifest-contract.md) when creating, selecting, or changing a journey manifest.
+Read [delivery contract](references/delivery-contract.md) for shaping or completion. Read [projection contract](references/manifest-contract.md) when creating, selecting, or changing journey projections. Read [bounded retrieval](references/retrieval-contract.md) before target, WorkItem, impact, validation, history, or audit retrieval. Read [schema-v1 migration](references/migration-contract.md) only for an explicitly requested migration.
 
 Before a credentialed, destructive, or release-significant journey against a shared environment, read [deployment freshness](references/deployment-freshness.md). Require one retained receipt whose exact environment, deployable unit, endpoint, artifact, applicable public configuration, and source identities match the target under review. Stop on `STALE` or `UNKNOWN` unless the user explicitly requests a stale-target diagnostic; that diagnostic never raises the supported delivery level or proves current source. The check does not apply to source-only, component, contract, or local-loopback evidence and never authorizes deployment.
 
@@ -33,7 +33,7 @@ Before a credentialed, destructive, or release-significant journey against a sha
 - Documentation Maintenance owns the bounded completion-time documentation check.
 - Knowledge Consolidation may optionally distill reusable meaning after delivery evidence is complete. It is downstream, non-authorizing work and never a preflight, evidence, or archive gate.
 
-Do not retrieve secrets, invent identities, infer external approval, weaken an owning service's authorization, or treat a manifest as runtime authority.
+Do not retrieve secrets, invent identities, infer external approval, weaken an owning service's authorization, or treat a projection as runtime authority.
 
 ## Use the evidence ladder
 
@@ -51,7 +51,7 @@ An applicable work item claims integrated or staging behavior, introduces a depl
 
 Ordinary source-only work stays lightweight. If it contributes to a registered journey, name the downstream integration consumer; otherwise do not manufacture a journey.
 
-Consumers that do not use Delivery Spine need no manifest. Require a valid manifest only when an applicable Spine operation needs journey registration, impact mapping, or gate evidence. Consumer conventions may select applicability and the `--manifest-path` argument; Delivery Spine does not parse or own those conventions, and their selection grants no persistence or transition authority.
+Consumers that do not use Delivery Spine need no projection. Require a valid projection only when an applicable Spine operation needs journey registration, impact mapping, or gate evidence. Consumer conventions may select applicability, an adapter, and consumer-relative arguments; Delivery Spine does not parse or own those conventions, and their selection grants no persistence or transition authority.
 
 ## Run deterministic gates
 
@@ -63,6 +63,12 @@ python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --transition 
 python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --transition archive --work-item <id>
 python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --changed-path <path> [--changed-path <path> ...]
 python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --manifest-path <consumer-relative-path>
+python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --adapter sharded --adapter-root <consumer-relative-root> --mode target --journey <id>
+python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --adapter sharded --adapter-root <consumer-relative-root> --mode work-item --work-item <id>
+python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --adapter sharded --adapter-root <consumer-relative-root> --transition start --work-item <id>
+python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --adapter sharded --adapter-root <consumer-relative-root> --mode impact --changed-path <path>
+python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --adapter sharded --adapter-root <consumer-relative-root> --mode history --journey <id> --claim <id>
+python3 skills/delivery-spine/scripts/migrate_delivery_spine.py . --manifest-path <v1-path> --adapter-root <v2-root>
 python3 skills/delivery-spine/scripts/deployment_freshness.py check --receipt <path> --environment <name> --deployable-unit <name> --endpoint <https-url> --artifact-path <path> --source-path <path>
 ```
 

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workspace.local/schemas/delivery-spine-claim-index.schema.json",
+  "title": "Delivery Spine current claim index",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "active_staging_slice", "claims"],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "active_staging_slice": { "type": ["string", "null"], "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["journey_id", "work_item_id", "claim_path"],
+        "properties": {
+          "journey_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "work_item_id": { "type": "string", "minLength": 1 },
+          "claim_path": { "type": "string", "pattern": "^claims/[a-z0-9]+(?:-[a-z0-9]+)*\\.json$" }
+        }
+      }
+    }
+  }
+}

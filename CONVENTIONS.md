@@ -51,7 +51,7 @@ Use `must` only for an invariant required by safety, authority, or a cross-stage
 - Resolve adapter paths relative to the consumer root, never the installed skill package, and reject paths that escape the consumer boundary.
 - Treat `_notes/plans/**` as a compatibility projection, not a universal layout or canonical runtime state.
 - Do not require `_notes/DELIVERY.md`; prefer consumer conventions for ordinary customization and introduce structured configuration only for a demonstrated machine-readable need.
-- Keep Delivery Spine manifests separate from general configuration because they retain optional operational journey evidence. Their existence must remain conditional on Delivery Spine use.
+- Keep Delivery Spine projections separate from general configuration because they retain optional operational journey evidence. Their existence must remain conditional on Delivery Spine use, and routine retrieval must not load completed history.
 
 ## References and tests
 

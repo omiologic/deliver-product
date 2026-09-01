@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a consumer delivery-spine manifest and lifecycle transition evidence."""
+"""Retrieve or validate Delivery Spine projections and transition evidence."""
 
 from __future__ import annotations
 
@@ -11,6 +11,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
+
+from delivery_spine_projection import (
+    DEFAULT_ADAPTER_ROOT,
+    ShardedAdapter,
+    impacted_registrations,
+    safe_relative_path as projection_safe_relative_path,
+    validate_claim,
+)
 
 
 LEVELS = ("source_complete", "integrated", "staging_verified")
@@ -358,12 +366,222 @@ def impacted_journeys(paths: Iterable[str], journeys: dict[str, dict[str, Any]])
     return sorted(impacted)
 
 
-def emit(diagnostics: list[Diagnostic]) -> int:
-    for diagnostic in diagnostics:
+def emit(diagnostics: list[Diagnostic], *, limit: int = 100) -> int:
+    ordered = sorted(diagnostics, key=lambda value: (value.severity, value.subject, value.message))
+    for diagnostic in ordered[:limit]:
         print(f"{diagnostic.severity}: {diagnostic.subject}: {diagnostic.message}")
     errors = sum(diagnostic.severity == "error" for diagnostic in diagnostics)
+    if len(ordered) > limit:
+        print(f"diagnostics omitted: {len(ordered) - limit}")
     print(f"delivery-spine validation: {errors} error(s)")
     return 1 if errors else 0
+
+
+def validate_sharded_projection(
+    adapter: ShardedAdapter,
+    items: dict[str, WorkItem],
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], str | None, list[Diagnostic]]:
+    journeys, diagnostics = adapter.registry()
+    indexed, by_work_item, active_slice, found = adapter.claim_index()
+    diagnostics.extend(found)
+    archived_work_items: set[str] = set()
+
+    for journey_id, entry in indexed.items():
+        if journey_id not in journeys:
+            diagnostics.append(Diagnostic("error", journey_id, "current claim journey is not registered"))
+        claim, claim_diagnostics = adapter.claim(journey_id)
+        diagnostics.extend(claim_diagnostics)
+        if claim is None:
+            continue
+        if claim.get("journey_id") != journey_id:
+            diagnostics.append(Diagnostic("error", journey_id, "claim journey_id does not match its index entry"))
+        if claim.get("work_item_id") != entry.get("work_item_id"):
+            diagnostics.append(Diagnostic("error", journey_id, "claim work_item_id does not match its index entry"))
+        owner = items.get(str(claim.get("work_item_id")))
+        if not owner:
+            diagnostics.append(Diagnostic("error", journey_id, f"work_item_id does not resolve: {claim.get('work_item_id')}"))
+            continue
+        if owner.lifecycle == "archived":
+            diagnostics.append(Diagnostic("error", journey_id, "completed WorkItem remains in the current claim working set"))
+        if owner.delivery.get("journey_id") != journey_id:
+            diagnostics.append(Diagnostic("error", owner.work_item_id, "Delivery spine Journey ID does not match claim"))
+        if owner.delivery.get("target_evidence") != claim.get("target_level"):
+            diagnostics.append(Diagnostic("error", owner.work_item_id, "Delivery spine Target evidence does not match claim"))
+        if not owner.delivery.get("integration_consumer"):
+            diagnostics.append(Diagnostic("error", owner.work_item_id, "Delivery spine Integration consumer is required"))
+
+    for journey_id in journeys:
+        baseline, baseline_diagnostics = adapter.baseline(journey_id)
+        diagnostics.extend(baseline_diagnostics)
+        if baseline is not None and baseline.get("journey_id") != journey_id:
+            diagnostics.append(Diagnostic("error", journey_id, "baseline journey_id does not match its filename"))
+        if baseline is not None and isinstance(baseline.get("claim_id"), str):
+            archived, archive_diagnostics = adapter.archived_claim(journey_id, baseline["claim_id"])
+            diagnostics.extend(archive_diagnostics)
+            if archived is not None and archived.get("current_level") != baseline.get("current_level"):
+                diagnostics.append(Diagnostic("error", journey_id, "baseline level does not match its archived claim"))
+
+    for path in adapter.archive_paths():
+        data, archive_diagnostics = adapter.read(str(path.relative_to(adapter.root))) if adapter.root else (None, [])
+        diagnostics.extend(archive_diagnostics)
+        subject = str(path.relative_to(adapter.root)) if adapter.root else str(path)
+        if data is None:
+            continue
+        diagnostics.extend(validate_claim(data, subject))
+        journey_id = data.get("journey_id")
+        claim_id = data.get("claim_id")
+        if journey_id not in journeys:
+            diagnostics.append(Diagnostic("error", subject, "archived claim journey is not registered"))
+        if path.parent.name != journey_id or path.stem != claim_id:
+            diagnostics.append(Diagnostic("error", subject, "archived claim path does not match its journey_id and claim_id"))
+        work_item_id = data.get("work_item_id")
+        if isinstance(work_item_id, str):
+            if work_item_id in archived_work_items:
+                diagnostics.append(Diagnostic("error", work_item_id, "duplicate archived WorkItem claim"))
+            archived_work_items.add(work_item_id)
+            if work_item_id in by_work_item:
+                diagnostics.append(Diagnostic("error", work_item_id, "archived WorkItem also has a current claim"))
+            owner = items.get(work_item_id)
+            if owner is None:
+                diagnostics.append(Diagnostic("error", work_item_id, "archived claim WorkItem does not resolve"))
+            elif owner.lifecycle != "archived":
+                diagnostics.append(Diagnostic("error", work_item_id, "historical claim requires an archived owner-produced WorkItem"))
+
+    if active_slice is not None:
+        active_claim, claim_diagnostics = adapter.claim(active_slice)
+        diagnostics.extend(claim_diagnostics)
+        if active_claim is not None:
+            owner = items.get(str(active_claim.get("work_item_id")))
+            if active_claim.get("target_level") != "staging_verified":
+                diagnostics.append(Diagnostic("error", active_slice, "active staging slice must target staging_verified"))
+            if owner and owner.lifecycle != "active":
+                diagnostics.append(Diagnostic("error", active_slice, "active staging slice owner must be in active/"))
+
+    active_claims = sorted(
+        item.delivery.get("journey_id", item.work_item_id)
+        for item in items.values()
+        if item.lifecycle == "active" and item.delivery.get("target_evidence") == "staging_verified"
+    )
+    if active_slice is None and active_claims:
+        diagnostics.append(Diagnostic("error", "claims/index", "active staging work exists but active_staging_slice is null"))
+    if active_slice is not None and active_claims != [active_slice]:
+        diagnostics.append(Diagnostic("error", "claims/index", f"active staging claims must be exactly {active_slice}: {active_claims}"))
+    return journeys, indexed, active_slice, diagnostics
+
+
+def sharded_selection(
+    adapter: ShardedAdapter,
+    mode: str,
+    *,
+    journey_id: str | None,
+    work_item_id: str | None,
+    claim_id: str | None,
+    evidence_reference: str | None,
+    dependency: str | None,
+    changed_paths: list[str],
+) -> tuple[dict[str, Any] | None, str | None, list[Diagnostic]]:
+    journeys, diagnostics = adapter.registry()
+    if mode == "impact":
+        for path in changed_paths:
+            if not projection_safe_relative_path(path):
+                diagnostics.append(Diagnostic("error", path, "changed path must be repository-relative"))
+        impacted = impacted_registrations(changed_paths, journeys)
+        return {
+            "mode": "impact",
+            "impacted": impacted,
+            "missing_suite_references": [value["journey_id"] for value in impacted if not value["suites"]],
+        }, None, diagnostics
+
+    indexed, by_work_item, active_slice, index_diagnostics = adapter.claim_index()
+    diagnostics.extend(index_diagnostics)
+    selected_journey = journey_id
+    if mode == "work-item":
+        if not work_item_id:
+            diagnostics.append(Diagnostic("error", "retrieval", "work-item mode requires --work-item"))
+        else:
+            selected_journey = by_work_item.get(work_item_id)
+            if selected_journey is None:
+                diagnostics.append(Diagnostic("error", work_item_id, "no current claim matches the WorkItem"))
+
+    if mode in ("target", "work-item"):
+        if not selected_journey:
+            diagnostics.append(Diagnostic("error", "retrieval", f"{mode} mode requires an exact journey or WorkItem"))
+            return None, None, diagnostics
+        registration = journeys.get(selected_journey)
+        if registration is None:
+            diagnostics.append(Diagnostic("error", selected_journey, "journey is not registered"))
+            return None, selected_journey, diagnostics
+        claim = None
+        if selected_journey in indexed:
+            claim, found = adapter.claim(selected_journey)
+            diagnostics.extend(found)
+        baseline, found = adapter.baseline(selected_journey)
+        diagnostics.extend(found)
+        return {
+            "mode": mode,
+            "journey": registration,
+            "claim": claim,
+            "baseline": baseline,
+            "active_staging_slice": active_slice,
+        }, selected_journey, diagnostics
+
+    if mode == "history":
+        if not selected_journey:
+            diagnostics.append(Diagnostic("error", "retrieval", "history mode requires --journey"))
+            return None, None, diagnostics
+        if claim_id:
+            claim, found = adapter.archived_claim(selected_journey, claim_id)
+            diagnostics.extend(found)
+            return {"mode": "history", "journey_id": selected_journey, "claim": claim}, selected_journey, diagnostics
+        if evidence_reference or dependency:
+            matches: list[dict[str, Any]] = []
+            for path in adapter.archive_paths():
+                if path.parent.name != selected_journey:
+                    continue
+                data, found = adapter.read(str(path.relative_to(adapter.root))) if adapter.root else (None, [])
+                diagnostics.extend(found)
+                evidence_match = evidence_reference and any(
+                    record.get("reference") == evidence_reference
+                    for record in data.get("evidence", [])
+                    if isinstance(record, dict)
+                )
+                dependency_match = dependency and data and data.get("work_item_id") == dependency
+                if data and (evidence_match or dependency_match):
+                    matches.append(data)
+            if len(matches) != 1:
+                selector = "evidence reference" if evidence_reference else "dependency"
+                diagnostics.append(Diagnostic("error", selected_journey, f"{selector} must resolve exactly one archived claim; found {len(matches)}"))
+            return {"mode": "history", "journey_id": selected_journey, "claims": matches}, selected_journey, diagnostics
+        diagnostics.append(Diagnostic("error", "retrieval", "history mode requires --claim, --dependency, or --evidence-reference"))
+        return None, selected_journey, diagnostics
+
+    if mode == "audit":
+        records: list[dict[str, Any]] = []
+        for path in adapter.archive_paths():
+            data, found = adapter.read(str(path.relative_to(adapter.root))) if adapter.root else (None, [])
+            diagnostics.extend(found)
+            if data is not None:
+                records.append(data)
+        current: list[dict[str, Any]] = []
+        for selected in sorted(indexed):
+            data, found = adapter.claim(selected)
+            diagnostics.extend(found)
+            if data is not None:
+                current.append(data)
+        baselines: list[dict[str, Any]] = []
+        for selected in sorted(journeys):
+            data, found = adapter.baseline(selected)
+            diagnostics.extend(found)
+            if data is not None:
+                baselines.append(data)
+        return {
+            "mode": "audit",
+            "registry": list(journeys.values()),
+            "current_claims": current,
+            "baselines": baselines,
+            "archived_claims": records,
+        }, None, diagnostics
+    return None, None, diagnostics
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -374,15 +592,83 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_MANIFEST_PATH,
         help=f"consumer-relative manifest path (default: {DEFAULT_MANIFEST_PATH})",
     )
+    parser.add_argument("--adapter", choices=("v1", "sharded"), default="v1")
+    parser.add_argument(
+        "--adapter-root",
+        default=DEFAULT_ADAPTER_ROOT,
+        help=f"consumer-relative sharded adapter root (default: {DEFAULT_ADAPTER_ROOT})",
+    )
+    parser.add_argument("--mode", choices=("target", "work-item", "impact", "validation", "history", "audit"), default="validation")
+    parser.add_argument("--journey")
+    parser.add_argument("--claim")
+    parser.add_argument("--evidence-reference")
+    parser.add_argument("--dependency", help="exact archived WorkItem dependency reference")
     parser.add_argument("--transition", choices=("start", "archive"))
     parser.add_argument("--work-item")
     parser.add_argument("--changed-path", action="append", default=[])
     args = parser.parse_args(argv)
-    if bool(args.transition) != bool(args.work_item):
-        parser.error("--transition and --work-item must be supplied together")
+    if args.transition and not args.work_item:
+        parser.error("--transition requires --work-item")
+    if args.work_item and not args.transition and args.mode != "work-item":
+        parser.error("--work-item without --transition requires --mode work-item")
 
     root = args.root.resolve()
-    items, diagnostics = load_work_items(root)
+    if args.changed_path and args.mode == "validation":
+        mode = "impact"
+    else:
+        mode = args.mode
+    items: dict[str, WorkItem] = {}
+    diagnostics: list[Diagnostic] = []
+    if args.adapter == "v1" or args.transition or mode == "validation":
+        items, diagnostics = load_work_items(root)
+
+    if args.adapter == "sharded":
+        adapter = ShardedAdapter(root, args.adapter_root)
+        if args.transition and args.work_item:
+            item = items.get(args.work_item)
+            journey_id = item.delivery.get("journey_id") if item else None
+            journeys_for_gate: dict[str, dict[str, Any]] = {}
+            active_slice = None
+            if journey_id and journey_id != "none":
+                result, selected_journey, found = sharded_selection(
+                    adapter,
+                    "work-item",
+                    journey_id=None,
+                    work_item_id=args.work_item,
+                    claim_id=None,
+                    evidence_reference=None,
+                    dependency=None,
+                    changed_paths=[],
+                )
+                diagnostics.extend(found)
+                if result is not None:
+                    print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+                claim = result.get("claim") if result else None
+                if selected_journey and claim is not None:
+                    journeys_for_gate[selected_journey] = claim
+                _, _, active_slice, found = adapter.claim_index()
+                diagnostics.extend(found)
+            diagnostics.extend(transition_diagnostics(args.transition, args.work_item, items, journeys_for_gate, active_slice))
+            return emit(diagnostics)
+        if mode == "validation":
+            _, _, _, found = validate_sharded_projection(adapter, items)
+            diagnostics.extend(found)
+        else:
+            result, selected_journey, found = sharded_selection(
+                adapter,
+                mode,
+                journey_id=args.journey,
+                work_item_id=args.work_item,
+                claim_id=args.claim,
+                evidence_reference=args.evidence_reference,
+                dependency=args.dependency,
+                changed_paths=args.changed_path,
+            )
+            diagnostics.extend(found)
+            if result is not None:
+                print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return emit(diagnostics)
+
     manifest_path, path_diagnostics = resolve_manifest_path(root, args.manifest_path)
     diagnostics.extend(path_diagnostics)
     manifest: dict[str, Any] | None = None
@@ -395,7 +681,22 @@ def main(argv: list[str] | None = None) -> int:
         diagnostics.extend(found)
         if args.transition and args.work_item:
             diagnostics.extend(transition_diagnostics(args.transition, args.work_item, items, journeys, manifest.get("active_staging_slice")))
-        if args.changed_path:
+        if mode == "target":
+            if not args.journey or args.journey not in journeys:
+                diagnostics.append(Diagnostic("error", args.journey or "retrieval", "target mode requires a registered --journey"))
+            else:
+                print(json.dumps({"mode": "target", "journey": journeys[args.journey]}, sort_keys=True, separators=(",", ":")))
+        elif mode == "work-item":
+            selected = [journey for journey in journeys.values() if journey.get("work_item_id") == args.work_item]
+            if len(selected) != 1:
+                diagnostics.append(Diagnostic("error", args.work_item or "retrieval", f"work-item mode must resolve exactly one journey; found {len(selected)}"))
+            else:
+                print(json.dumps({"mode": "work-item", "journey": selected[0]}, sort_keys=True, separators=(",", ":")))
+        elif mode == "history":
+            diagnostics.append(Diagnostic("error", "schema-v1", "history is unavailable because the monolithic manifest has no archived claim projection"))
+        elif mode == "audit":
+            print(json.dumps({"mode": "audit", "manifest": manifest}, sort_keys=True, separators=(",", ":")))
+        if mode == "impact":
             invalid = [path for path in args.changed_path if not safe_relative_path(path)]
             for path in invalid:
                 diagnostics.append(Diagnostic("error", path, "changed path must be repository-relative"))
