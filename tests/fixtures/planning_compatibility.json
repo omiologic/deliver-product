@@ -1,0 +1,37 @@
+[
+  {
+    "name": "clean canonical projection",
+    "mutation": "none",
+    "expected": []
+  },
+  {
+    "name": "project identity mismatch",
+    "mutation": "wrong-project",
+    "expected": ["work_item_id project key must match 'catalog-api'"]
+  },
+  {
+    "name": "sequence beyond high water mark",
+    "mutation": "high-sequence",
+    "expected": ["work_item_id sequence exceeds last_work_item_sequence"]
+  },
+  {
+    "name": "ready dependency does not resolve",
+    "mutation": "missing-dependency",
+    "expected": ["dependency does not resolve: catalog-api-00001", "ready item has unsatisfied dependencies"]
+  },
+  {
+    "name": "backlog dependency is already satisfied",
+    "mutation": "actionable-backlog",
+    "expected": ["backlog item has satisfied dependencies"]
+  },
+  {
+    "name": "target escapes repository",
+    "mutation": "escaping-target",
+    "expected": ["target path must be repository-relative: '../outside'"]
+  },
+  {
+    "name": "post-boundary legacy identifier",
+    "mutation": "late-legacy",
+    "expected": ["legacy work_item_id is not allowed on or after canonical_ids_from"]
+  }
+]

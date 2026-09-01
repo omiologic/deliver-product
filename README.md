@@ -34,7 +34,7 @@ Delivery Planning is designed to scale through selectively loaded planning-type 
 
 ## Status
 
-The repository contains the first contract scaffold for all four core skills and an unchanged import of `delivery-spine` from its original system-local package. Delivery Planning now documents thin planning-type routing, its bounded default, and consumer-convention customization. `scripts/validate.py` verifies package metadata, package-local links, core routing coverage, execution boundaries, and the reconciliation vocabulary. Planning compatibility, broader consumer integration fixtures, installation tooling, and migration from Context Governance remain future work.
+The repository contains the first contract scaffold for all four core skills and an unchanged import of `delivery-spine` from its original system-local package. Delivery Planning now provides thin planning-type routing, selectively loaded feature, sprint, research, and coordination procedures, and an optional repository-local compatibility adapter with dependency-free validation for legacy `_notes/plans/**` projections. `scripts/validate.py` verifies package metadata, package-local links, planning compatibility resources, core routing coverage, execution boundaries, and the reconciliation vocabulary. Broader consumer integration, installation tooling, and migration from Context Governance remain future work.
 
 The imported `delivery-spine` contract still reflects its original consumer's current Context Governance ownership language. That compatibility gap is intentionally recorded rather than rewritten during the byte-for-byte import; it must be reconciled before the package is presented as fully aligned with this repository's target ownership model.
 

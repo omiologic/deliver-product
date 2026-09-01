@@ -34,7 +34,24 @@ PLANNING_REFERENCES = (
     "references/planning-type-routing.md",
     "references/consumer-conventions.md",
     "references/planning-types/bounded-outcome.md",
+    "references/planning-types/feature-development.md",
+    "references/planning-types/sprint.md",
+    "references/planning-types/research.md",
+    "references/planning-types/phased-project.md",
+    "references/adapters/repository-local-work-items.md",
+    "references/adapters/repository-local/planning-profiles.md",
+    "references/adapters/repository-local/work-item-conventions.md",
+    "references/adapters/repository-local/work-item-lifecycle.md",
 )
+PLANNING_COMPATIBILITY_FILES = (
+    "assets/task-template.md",
+    "scripts/validate_plans.py",
+)
+
+
+def normalize_planning_type(value: str) -> str:
+    """Preserve the legacy quick-task identifier without duplicating a procedure."""
+    return DEFAULT_PLANNING_TYPE if value == "quick-task" else value
 
 
 def frontmatter(text: str) -> dict[str, str]:
@@ -67,11 +84,11 @@ def select_planning_type(
         ("consumer-convention", consumer_convention),
     ):
         if value:
-            return value, source
+            return normalize_planning_type(value), source
     if materially_ambiguous:
         return None, "unresolved"
     if clear_inference:
-        return clear_inference, "clear-inference"
+        return normalize_planning_type(clear_inference), "clear-inference"
     return DEFAULT_PLANNING_TYPE, "default"
 
 
@@ -113,6 +130,9 @@ def validate() -> list[str]:
 
     planning_package = skill_root / "delivery-planning"
     for relative in PLANNING_REFERENCES:
+        if not (planning_package / relative).is_file():
+            errors.append(f"delivery-planning: missing {relative}")
+    for relative in PLANNING_COMPATIBILITY_FILES:
         if not (planning_package / relative).is_file():
             errors.append(f"delivery-planning: missing {relative}")
 

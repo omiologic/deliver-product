@@ -47,6 +47,22 @@
     "expected_source": "unresolved"
   },
   {
+    "name": "legacy quick task uses bounded outcome procedure",
+    "inputs": {
+      "explicit": "quick-task"
+    },
+    "expected_type": "bounded-outcome",
+    "expected_source": "explicit"
+  },
+  {
+    "name": "consumer owned type remains available",
+    "inputs": {
+      "consumer_convention": "consumer-release-train"
+    },
+    "expected_type": "consumer-release-train",
+    "expected_source": "consumer-convention"
+  },
+  {
     "name": "thin default needs no consumer files",
     "inputs": {},
     "expected_type": "bounded-outcome",
