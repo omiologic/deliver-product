@@ -92,9 +92,11 @@ PLANNING_REFERENCES = (
     "references/adapters/repository-local/planning-profiles.md",
     "references/adapters/repository-local/work-item-conventions.md",
     "references/adapters/repository-local/work-item-lifecycle.md",
+    "references/adapters/repository-local/retrieval-contract.md",
 )
 PLANNING_COMPATIBILITY_FILES = (
     "assets/task-template.md",
+    "scripts/retrieve_plans.py",
     "scripts/validate_plans.py",
 )
 

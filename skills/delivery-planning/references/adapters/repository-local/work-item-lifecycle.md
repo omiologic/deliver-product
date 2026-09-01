@@ -8,4 +8,6 @@ For an authorized lifecycle change, re-read the profile, index, and affected ite
 
 Preserve all four index headings and use an empty placeholder only for an empty section. Every current item must be indexed exactly once, every link must resolve, every compacted cycle must have one indexed summary, and relative links inside moved items must remain valid.
 
-Archive rather than delete by default. Compaction and deletion require explicit requests. A completion record is evidence in the projection, not proof of canonical acceptance or authority to perform another effect.
+Archive rather than delete by default. Compaction and deletion require explicit requests. Before compaction, use exact cycle retrieval to prove the bounded selection: every selected item belongs to that owner-produced cycle, is archived, and has a non-placeholder result other than cancellation or supersession. Refuse an empty, mixed, current, already-compacted, or ambiguous selection.
+
+An authorized compaction changes only the explicitly selected completed cycle. Move its records below `archived/history/<cycle-id>/`, create `archived/summaries/<cycle-id>.md`, and replace the selected records' index links with exactly one summary link in the same bounded change. Do not compact another cycle, delete source history, or infer completion from dates, directory presence, or retrieval eligibility. A completion record is evidence in the projection, not proof of canonical acceptance or authority to perform another effect.

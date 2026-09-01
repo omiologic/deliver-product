@@ -32,3 +32,9 @@ Use applicability, conflict, and blocker classifications supplied by Context Gov
 ## Persistence boundary
 
 Planning is advisory by default and requires no local files. Persist only when the user explicitly requests it or an owner-produced workflow requires it and the necessary filesystem authority exists. Use the consumer-selected adapter and resolve its paths relative to the consumer root. A stored artifact remains a projection and does not become canonical runtime state.
+
+## Projection retrieval
+
+When a selected adapter contains durable planning history, retrieve the smallest context supported by exact owner-produced selectors and explicit intent. Distinguish path and minimum metadata enumeration from loading artifact bodies. Default target retrieval should load only the selected WorkItem, its required dependency closure, and summaries needed to orient selected archived detail. Broad content reads require explicit audit intent.
+
+Deterministic validation may inspect the full selected projection while returning compact diagnostics rather than the inspected corpus. Retrieval and successful validation are observations; they do not grant persistence, transition, execution, deletion, or compaction authority.

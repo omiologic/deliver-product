@@ -45,4 +45,6 @@ Selecting an adapter in conventions does not invoke it. Pass the consumer root a
 
 When the selected projection is the package's repository-local work-item adapter, read [repository-local work items](adapters/repository-local-work-items.md). Its default compatibility paths are `_notes/plans` and `_notes/GOVERNANCE.md`; a consumer may override either with a relative path. Other adapters remain consumer-owned and do not need to be copied into this package.
 
+For repository-local retrieval, pass an exact WorkItem, lifecycle, or cycle selector from the consumer when available. The adapter first enumerates minimum metadata, resolves the selector and dependency closure, reads applicable archived summaries, and only then loads selected bodies. Use broad audit or full validation modes only when explicitly requested by their operation; adapter selection alone does not authorize either.
+
 `_notes/DELIVERY.md` is not required. A consumer may introduce structured Delivery configuration for a demonstrated machine-readable need, but ordinary customization belongs in its conventions. Delivery Spine manifests remain separate optional operational projections rather than general Delivery configuration.
