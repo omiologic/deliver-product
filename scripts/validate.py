@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import math
 import re
+import statistics
 import sys
 from pathlib import Path
 from typing import Any
@@ -94,6 +97,80 @@ PLANNING_COMPATIBILITY_FILES = (
     "assets/task-template.md",
     "scripts/validate_plans.py",
 )
+
+
+def validate_agent_view_policy() -> list[str]:
+    """Validate retained benchmark evidence and auto-selection thresholds."""
+    errors: list[str] = []
+    root = ROOT / "skills" / "delivery-spine"
+    policy_path = root / "references" / "agent-view-selection-policy.json"
+    results_path = root / "references" / "agent-view-benchmark-results.json"
+    fixture_path = root / "tests" / "fixtures" / "agent-view-workloads.json"
+    try:
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        results = json.loads(results_path.read_text(encoding="utf-8"))
+        fixture_hash = hashlib.sha256(fixture_path.read_bytes()).hexdigest()
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"delivery-spine agent views: cannot load policy evidence: {exc}"]
+    if policy.get("schema_version") != 1 or results.get("schema_version") != 1:
+        errors.append("delivery-spine agent views: policy and results must use schema version 1")
+        return errors
+    if fixture_hash != results.get("fixture_sha256") or fixture_hash != policy.get("benchmark", {}).get("fixture_sha256"):
+        errors.append("delivery-spine agent views: benchmark fixture hash does not match retained evidence")
+    try:
+        compact_counts = [
+            next(candidate["tokens"] for candidate in workload["candidates"] if candidate["candidate"] == "compact-json")
+            for workload in results["results"]
+        ]
+        expected_floor = math.ceil(0.15 * statistics.median(compact_counts))
+    except (KeyError, StopIteration, TypeError, statistics.StatisticsError):
+        errors.append("delivery-spine agent views: benchmark results lack compact-JSON measurements")
+        return errors
+    if expected_floor != policy.get("thresholds", {}).get("absolute_floor_tokens"):
+        errors.append("delivery-spine agent views: absolute token floor is not benchmark-derived")
+    minimum_percent = policy.get("thresholds", {}).get("minimum_percent")
+    if minimum_percent != 15:
+        errors.append("delivery-spine agent views: minimum net savings must remain 15 percent")
+    for workload in results.get("results", []):
+        for candidate in workload.get("candidates", []):
+            if candidate.get("available") and (
+                not candidate.get("lossless") or not candidate.get("task_answer_parity")
+            ):
+                errors.append(
+                    "delivery-spine agent views: eligible benchmark candidate failed "
+                    f"reconstruction or answer parity: {candidate.get('candidate')}"
+                )
+    approved_candidates = policy.get("approved_candidates", [])
+    aliases_approved = policy.get("property_aliases", {}).get("approved") is True
+    if aliases_approved != ("header-json-aliases" in approved_candidates):
+        errors.append("delivery-spine agent views: alias approval disagrees with approved candidates")
+    for approved in approved_candidates:
+        qualifying = False
+        for workload in results["results"]:
+            try:
+                baseline = next(item for item in workload["candidates"] if item["candidate"] == "compact-json")
+                candidate = next(item for item in workload["candidates"] if item["candidate"] == approved)
+            except StopIteration:
+                errors.append(f"delivery-spine agent views: approved candidate lacks measurements: {approved}")
+                break
+            if not candidate.get("lossless") or not candidate.get("task_answer_parity"):
+                errors.append(f"delivery-spine agent views: approved candidate failed parity: {approved}")
+                break
+            saved = baseline["tokens"] - candidate["tokens"]
+            qualifying = qualifying or (
+                saved >= expected_floor and 100 * saved / baseline["tokens"] >= minimum_percent
+            )
+        if not qualifying:
+            errors.append(f"delivery-spine agent views: approved candidate has no qualifying workload: {approved}")
+    if aliases_approved:
+        incremental_win = False
+        for workload in results["results"]:
+            plain = next(item for item in workload["candidates"] if item["candidate"] == "header-json")
+            aliased = next(item for item in workload["candidates"] if item["candidate"] == "header-json-aliases")
+            incremental_win = incremental_win or aliased["tokens"] < plain["tokens"]
+        if not incremental_win:
+            errors.append("delivery-spine agent views: approved aliases lack an incremental net win")
+    return errors
 
 
 def normalize_planning_type(value: str) -> str:
@@ -783,6 +860,7 @@ def validate() -> list[str]:
         errors.append("delivery-reconciliation: missing assessment contract")
 
     errors.extend(validate_scenario_fixtures())
+    errors.extend(validate_agent_view_policy())
 
     return errors
 

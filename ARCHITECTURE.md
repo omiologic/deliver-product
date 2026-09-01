@@ -196,6 +196,8 @@ Repository-local `_notes/plans/**` files are one supported compatibility project
 
 Delivery Spine projections remain separate because they retain optional operational journey evidence rather than general Delivery configuration. The schema-v2 sharded adapter separates stable registration, open claims, compact baselines, and archived claims so completed history leaves routine context while journeys remain available for impact selection. `_notes/delivery-spine` is its thin default root. The schema-v1 `_notes/delivery-spine.json` monolith remains readable through the schema-v2 support window. Both are consumer-relative adapter defaults, not universal layouts, and consumers that do not use Delivery Spine need no projection.
 
+After bounded selection and operation-specific field projection, Delivery Spine may render an ephemeral agent-input view. Compact JSON is the stable default and fallback; alternate encodings require versioned benchmark evidence for lossless reconstruction, task-answer parity, and material net token savings. Agent views never redefine persisted JSON, stored property names, schemas, agent-generated structured output, or owner-controlled lifecycle state.
+
 Target, WorkItem, and preflight retrieval load the compact registry and current-claim index plus only the exact claim and baseline. Impact scans registry metadata only. History requires an exact journey plus a claim, WorkItem dependency, or evidence reference; broad archived evidence requires an explicit audit request. Migration is a separate authorized operation that preserves its source, refuses an existing destination, and never performs a lifecycle transition.
 
 ## Event-compatible vocabulary

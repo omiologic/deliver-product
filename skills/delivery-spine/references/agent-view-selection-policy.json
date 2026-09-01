@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "policy_version": "1.0.0",
+  "provenance": "skills/delivery-spine/tests/fixtures/agent-view-workloads.json via benchmark_agent_views.py",
+  "tokenizer": {
+    "implementation": "tiktoken",
+    "version": "0.13.0",
+    "encoding": "o200k_base"
+  },
+  "thresholds": {
+    "minimum_percent": 15,
+    "absolute_floor_tokens": 219,
+    "derivation": "ceil(15% of the representative compact-JSON median), frozen before per-payload selection"
+  },
+  "approved_candidates": [
+    "header-json"
+  ],
+  "tie_break_order": [
+    "compact-json",
+    "header-json",
+    "toon",
+    "safe-yaml"
+  ],
+  "candidate_versions": {
+    "compact-json": "RFC8259",
+    "header-json": "1",
+    "header-json-aliases": "1",
+    "toon": "4.1",
+    "safe-yaml": "delivery-spine-safe-yaml-1.2-v1"
+  },
+  "candidate_implementations": {
+    "compact-json": {"implementation": "python-json", "version": "3.9.6"},
+    "header-json": {"implementation": "delivery-spine-header-rows", "version": "1"},
+    "header-json-aliases": {"implementation": "delivery-spine-header-rows-aliases", "version": "1"},
+    "toon": {"implementation": "toon-format", "version": "0.9.0b1"},
+    "safe-yaml": {"implementation": "PyYAML-restricted", "version": "6.0.2"}
+  },
+  "benchmark": {
+    "fixture_sha256": "adc00440672251fea71ef21264ff58a9d51e1861b58337ce6514ca42db498a03",
+    "results": "agent-view-benchmark-results.json",
+    "representative_compact_json_median_tokens": 1456
+  },
+  "property_aliases": {
+    "approved": false,
+    "version": "1",
+    "dictionary": {
+      "journey_id": "j",
+      "work_item_id": "w",
+      "target_level": "t",
+      "current_level": "c",
+      "observed_at": "o",
+      "affected_paths": "p",
+      "reference": "r",
+      "boundaries": "b",
+      "evidence": "e"
+    }
+  }
+}

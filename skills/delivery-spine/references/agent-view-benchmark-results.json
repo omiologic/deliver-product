@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "fixture": "skills/delivery-spine/tests/fixtures/agent-view-workloads.json",
+  "fixture_sha256": "adc00440672251fea71ef21264ff58a9d51e1861b58337ce6514ca42db498a03",
+  "tokenizer": {"encoding": "o200k_base", "implementation": "tiktoken", "version": "0.13.0"},
+  "floor_derivation": "ceil(15% of representative compact-JSON median)",
+  "absolute_floor_tokens": 219,
+  "results": [
+    {
+      "workload": "large-uniform-history",
+      "candidates": [
+        {"candidate": "compact-json", "available": true, "bytes": 32956, "tokens": 9256, "encoding_version": "RFC8259", "implementation": {"implementation": "python-json", "version": "3.9.6"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "header-json", "available": true, "bytes": 30888, "tokens": 9216, "encoding_version": "1", "implementation": {"implementation": "delivery-spine-header-rows", "version": "1"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "toon", "available": true, "bytes": 34778, "tokens": 9834, "encoding_version": "4.1", "implementation": {"implementation": "toon-format", "version": "0.9.0b1"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "safe-yaml", "available": true, "bytes": 35381, "tokens": 9927, "encoding_version": "delivery-spine-safe-yaml-1.2-v1", "implementation": {"implementation": "PyYAML-restricted", "version": "6.0.2"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "header-json-aliases", "available": true, "bytes": 29604, "tokens": 9113, "encoding_version": "1", "implementation": {"implementation": "delivery-spine-header-rows-aliases", "version": "1"}, "lossless": true, "task_answer_parity": true}
+      ]
+    },
+    {
+      "workload": "uniform-impact",
+      "candidates": [
+        {"candidate": "compact-json", "available": true, "bytes": 4694, "tokens": 1456, "encoding_version": "RFC8259", "implementation": {"implementation": "python-json", "version": "3.9.6"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "header-json", "available": true, "bytes": 3446, "tokens": 1173, "encoding_version": "1", "implementation": {"implementation": "delivery-spine-header-rows", "version": "1"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "toon", "available": true, "bytes": 4978, "tokens": 1535, "encoding_version": "4.1", "implementation": {"implementation": "toon-format", "version": "0.9.0b1"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "safe-yaml", "available": true, "bytes": 4961, "tokens": 1547, "encoding_version": "delivery-spine-safe-yaml-1.2-v1", "implementation": {"implementation": "PyYAML-restricted", "version": "6.0.2"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "header-json-aliases", "available": true, "bytes": 3661, "tokens": 1238, "encoding_version": "1", "implementation": {"implementation": "delivery-spine-header-rows-aliases", "version": "1"}, "lossless": true, "task_answer_parity": true}
+      ]
+    },
+    {
+      "workload": "nested-irregular-target",
+      "candidates": [
+        {"candidate": "compact-json", "available": true, "bytes": 1561, "tokens": 364, "encoding_version": "RFC8259", "implementation": {"implementation": "python-json", "version": "3.9.6"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "header-json", "available": true, "bytes": 1673, "tokens": 397, "encoding_version": "1", "implementation": {"implementation": "delivery-spine-header-rows", "version": "1"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "toon", "available": true, "bytes": 1511, "tokens": 391, "encoding_version": "4.1", "implementation": {"implementation": "toon-format", "version": "0.9.0b1"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "safe-yaml", "available": true, "bytes": 1666, "tokens": 425, "encoding_version": "delivery-spine-safe-yaml-1.2-v1", "implementation": {"implementation": "PyYAML-restricted", "version": "6.0.2"}, "lossless": true, "task_answer_parity": true},
+        {"candidate": "header-json-aliases", "available": true, "bytes": 1761, "tokens": 446, "encoding_version": "1", "implementation": {"implementation": "delivery-spine-header-rows-aliases", "version": "1"}, "lossless": true, "task_answer_parity": true}
+      ]
+    }
+  ]
+}

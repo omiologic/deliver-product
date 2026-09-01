@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
+from delivery_spine_agent_view import FORMATS, AgentViewError, render_agent_view
 from delivery_spine_projection import (
     DEFAULT_ADAPTER_ROOT,
     ShardedAdapter,
@@ -377,6 +378,13 @@ def emit(diagnostics: list[Diagnostic], *, limit: int = 100) -> int:
     return 1 if errors else 0
 
 
+def emit_agent_view(result: dict[str, Any], requested_encoding: str, diagnostics: list[Diagnostic]) -> None:
+    try:
+        print(render_agent_view(result, requested_encoding).text)
+    except AgentViewError as exc:
+        diagnostics.append(Diagnostic("error", "agent-view", str(exc)))
+
+
 def validate_sharded_projection(
     adapter: ShardedAdapter,
     items: dict[str, WorkItem],
@@ -599,6 +607,12 @@ def main(argv: list[str] | None = None) -> int:
         help=f"consumer-relative sharded adapter root (default: {DEFAULT_ADAPTER_ROOT})",
     )
     parser.add_argument("--mode", choices=("target", "work-item", "impact", "validation", "history", "audit"), default="validation")
+    parser.add_argument(
+        "--agent-view",
+        choices=FORMATS,
+        default="compact-json",
+        help="ephemeral encoding for selected agent input (default: compact-json)",
+    )
     parser.add_argument("--journey")
     parser.add_argument("--claim")
     parser.add_argument("--evidence-reference")
@@ -642,7 +656,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 diagnostics.extend(found)
                 if result is not None:
-                    print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+                    emit_agent_view(result, args.agent_view, diagnostics)
                 claim = result.get("claim") if result else None
                 if selected_journey and claim is not None:
                     journeys_for_gate[selected_journey] = claim
@@ -666,7 +680,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             diagnostics.extend(found)
             if result is not None:
-                print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+                emit_agent_view(result, args.agent_view, diagnostics)
         return emit(diagnostics)
 
     manifest_path, path_diagnostics = resolve_manifest_path(root, args.manifest_path)
@@ -685,23 +699,23 @@ def main(argv: list[str] | None = None) -> int:
             if not args.journey or args.journey not in journeys:
                 diagnostics.append(Diagnostic("error", args.journey or "retrieval", "target mode requires a registered --journey"))
             else:
-                print(json.dumps({"mode": "target", "journey": journeys[args.journey]}, sort_keys=True, separators=(",", ":")))
+                emit_agent_view({"mode": "target", "journey": journeys[args.journey]}, args.agent_view, diagnostics)
         elif mode == "work-item":
             selected = [journey for journey in journeys.values() if journey.get("work_item_id") == args.work_item]
             if len(selected) != 1:
                 diagnostics.append(Diagnostic("error", args.work_item or "retrieval", f"work-item mode must resolve exactly one journey; found {len(selected)}"))
             else:
-                print(json.dumps({"mode": "work-item", "journey": selected[0]}, sort_keys=True, separators=(",", ":")))
+                emit_agent_view({"mode": "work-item", "journey": selected[0]}, args.agent_view, diagnostics)
         elif mode == "history":
             diagnostics.append(Diagnostic("error", "schema-v1", "history is unavailable because the monolithic manifest has no archived claim projection"))
         elif mode == "audit":
-            print(json.dumps({"mode": "audit", "manifest": manifest}, sort_keys=True, separators=(",", ":")))
+            emit_agent_view({"mode": "audit", "manifest": manifest}, args.agent_view, diagnostics)
         if mode == "impact":
             invalid = [path for path in args.changed_path if not safe_relative_path(path)]
             for path in invalid:
                 diagnostics.append(Diagnostic("error", path, "changed path must be repository-relative"))
             impacted = impacted_journeys(args.changed_path, journeys)
-            print("impacted journeys: " + (", ".join(impacted) if impacted else "none"))
+            emit_agent_view({"mode": "impact", "impacted_journey_ids": impacted}, args.agent_view, diagnostics)
     return emit(diagnostics)
 
 

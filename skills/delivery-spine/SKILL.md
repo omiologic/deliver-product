@@ -22,6 +22,8 @@ Choose the smallest applicable operation:
 
 Read [delivery contract](references/delivery-contract.md) for shaping or completion. Read [projection contract](references/manifest-contract.md) when creating, selecting, or changing journey projections. Read [bounded retrieval](references/retrieval-contract.md) before target, WorkItem, impact, validation, history, or audit retrieval. Read [schema-v1 migration](references/migration-contract.md) only for an explicitly requested migration.
 
+After bounded retrieval and field projection, read the [agent-view contract](references/agent-view-contract.md) when the user requests `toon`, `safe-yaml`, or `auto`, or when evaluating token-efficient agent input. Compact JSON remains the default and deterministic fallback. Agent views are ephemeral and never change persisted JSON projections or authority.
+
 Before a credentialed, destructive, or release-significant journey against a shared environment, read [deployment freshness](references/deployment-freshness.md). Require one retained receipt whose exact environment, deployable unit, endpoint, artifact, applicable public configuration, and source identities match the target under review. Stop on `STALE` or `UNKNOWN` unless the user explicitly requests a stale-target diagnostic; that diagnostic never raises the supported delivery level or proves current source. The check does not apply to source-only, component, contract, or local-loopback evidence and never authorizes deployment.
 
 ## Preserve owner boundaries
@@ -68,6 +70,7 @@ python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --adapter sha
 python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --adapter sharded --adapter-root <consumer-relative-root> --transition start --work-item <id>
 python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --adapter sharded --adapter-root <consumer-relative-root> --mode impact --changed-path <path>
 python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --adapter sharded --adapter-root <consumer-relative-root> --mode history --journey <id> --claim <id>
+python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --adapter sharded --adapter-root <consumer-relative-root> --mode target --journey <id> --agent-view auto
 python3 skills/delivery-spine/scripts/migrate_delivery_spine.py . --manifest-path <v1-path> --adapter-root <v2-root>
 python3 skills/delivery-spine/scripts/deployment_freshness.py check --receipt <path> --environment <name> --deployable-unit <name> --endpoint <https-url> --artifact-path <path> --source-path <path>
 ```

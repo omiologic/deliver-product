@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "workloads": [
+    {
+      "name": "large-uniform-history",
+      "generator": "large-uniform-history",
+      "count": 80,
+      "questions": [
+        {"id": "retrieval", "path": ["mode"], "expected": "history"},
+        {"id": "evidence-reference", "path": ["claims", 79, "evidence", 0, "reference"], "expected": "tests/evidence/history-00079.json"}
+      ]
+    },
+    {
+      "name": "uniform-impact",
+      "generator": "uniform-impact",
+      "count": 60,
+      "questions": [
+        {"id": "impact", "path": ["impacted", 59, "journey_id"], "expected": "journey-00059"},
+        {"id": "impact-suite", "path": ["impacted", 0, "suites", 0], "expected": "tests/journey-00000.test"}
+      ]
+    },
+    {
+      "name": "nested-irregular-target",
+      "generator": "nested-irregular-target",
+      "questions": [
+        {"id": "retrieval", "path": ["journey", "journey_id"], "expected": "identity-administration"},
+        {"id": "preflight", "path": ["claim", "boundaries", 1, "state"], "expected": "missing"},
+        {"id": "blocker", "path": ["claim", "blockers", 0], "expected": "identity-provider configuration is missing"},
+        {"id": "evidence-reference", "path": ["baseline", "evidence", 0, "reference"], "expected": "tests/evidence/identity-baseline.json"}
+      ]
+    }
+  ]
+}

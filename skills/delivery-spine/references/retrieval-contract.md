@@ -16,3 +16,5 @@ Target, WorkItem, preflight, and archive-gate operations must not return unrelat
 Schema-v1 target, WorkItem, impact, validation, and audit operations remain available through the compatibility reader. Schema v1 has no separate history projection, so `history` returns a bounded unsupported-mode diagnostic rather than treating current manifest content as archived evidence.
 
 Retrieval and successful validation are read-only observations. They never persist, compact, migrate, transition, deploy, release, approve, complete, or accept work.
+
+After selection and operation-specific projection, structured results may use the [agent-view contract](agent-view-contract.md). Rendering must not cause additional records to be loaded. Compact JSON is the default; alternate input encodings remain ephemeral and benchmark-gated.

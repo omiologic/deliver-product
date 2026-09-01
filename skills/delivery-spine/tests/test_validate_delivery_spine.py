@@ -327,8 +327,8 @@ class DeliverySpineValidatorTests(unittest.TestCase):
         self.write_manifest("first-journey", [journey("first-journey", "test-00001"), second])
         result = self.run_cli("--changed-path", "interfaces/test/component.ts")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("impacted journeys: first-journey", result.stdout)
-        self.assertNotIn("second-journey,", result.stdout)
+        self.assertIn('"impacted_journey_ids":["first-journey"]', result.stdout)
+        self.assertNotIn('"impacted_journey_ids":["second-journey"]', result.stdout)
 
     def test_sharded_projection_validates_and_preserves_gate_authority(self) -> None:
         self.write_item("active", "test-00001", "test-journey", "staging_verified", complete=True)
