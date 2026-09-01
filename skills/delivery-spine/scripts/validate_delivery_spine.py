@@ -660,8 +660,7 @@ def main(argv: list[str] | None = None) -> int:
                 claim = result.get("claim") if result else None
                 if selected_journey and claim is not None:
                     journeys_for_gate[selected_journey] = claim
-                _, _, active_slice, found = adapter.claim_index()
-                diagnostics.extend(found)
+                active_slice = result.get("active_staging_slice") if result else None
             diagnostics.extend(transition_diagnostics(args.transition, args.work_item, items, journeys_for_gate, active_slice))
             return emit(diagnostics)
         if mode == "validation":

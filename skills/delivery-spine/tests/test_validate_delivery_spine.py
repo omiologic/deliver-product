@@ -1,14 +1,25 @@
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+from io import StringIO
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
-SCRIPT = Path(__file__).parents[1] / "scripts" / "validate_delivery_spine.py"
+SKILL_ROOT = Path(__file__).parents[1]
+SCRIPTS = SKILL_ROOT / "scripts"
+sys.path.insert(0, str(SCRIPTS))
+
+import validate_delivery_spine as VALIDATOR  # noqa: E402
+from delivery_spine_projection import ShardedAdapter  # noqa: E402
+
+
+SCRIPT = SCRIPTS / "validate_delivery_spine.py"
 MIGRATION_SCRIPT = Path(__file__).parents[1] / "scripts" / "migrate_delivery_spine.py"
 
 
@@ -341,6 +352,74 @@ class DeliverySpineValidatorTests(unittest.TestCase):
         self.assertEqual(gate.returncode, 0, gate.stdout + gate.stderr)
         self.assertEqual(before, self.snapshot())
         self.assertTrue((self.root / "_notes" / "plans" / "active" / "test-00001.test.md").is_file())
+
+    def test_sharded_start_preflight_loads_only_selected_claim(self) -> None:
+        self.write_item("ready", "test-00001", "selected-journey", "integrated")
+        self.write_item("ready", "test-00002", "unrelated-journey", "integrated")
+        selected = journey("selected-journey", "test-00001", target="integrated")
+        selected["evidence"] = [
+            {
+                "class": "component",
+                "reference": "tests/selected-preflight-evidence",
+                "observed_at": "2026-08-27T00:00:00Z",
+            }
+        ]
+        unrelated = journey("unrelated-journey", "test-00002", target="integrated")
+        self.write_sharded(None, [selected, unrelated])
+
+        adapter = self.root / "_notes" / "delivery-spine"
+        sentinel = "UNRELATED-CLAIM-MUST-NOT-BE-READ"
+        unrelated_claim = adapter / "claims" / "unrelated-journey.json"
+        unrelated_claim.write_text(json.dumps({"sentinel": sentinel}), encoding="utf-8")
+        unrelated_archive = adapter / "archive" / "unrelated-journey" / "test-99999.json"
+        unrelated_archive.parent.mkdir(parents=True)
+        unrelated_archive.write_text(json.dumps({"sentinel": sentinel}), encoding="utf-8")
+
+        reads: list[str] = []
+        original_read = ShardedAdapter.read
+
+        def tracking_read(
+            instance: ShardedAdapter,
+            relative: str,
+        ) -> tuple[dict[str, object] | None, list[object]]:
+            reads.append(relative)
+            return original_read(instance, relative)
+
+        before = self.snapshot()
+        output = StringIO()
+        with mock.patch.object(ShardedAdapter, "read", new=tracking_read), redirect_stdout(output):
+            result = VALIDATOR.main(
+                [
+                    str(self.root),
+                    "--adapter",
+                    "sharded",
+                    "--transition",
+                    "start",
+                    "--work-item",
+                    "test-00001",
+                ]
+            )
+
+        rendered = output.getvalue()
+        projection = json.loads(rendered.splitlines()[0])["data"]
+        self.assertEqual(result, 0, rendered)
+        self.assertEqual("selected-journey", projection["journey"]["journey_id"])
+        self.assertEqual("test-00001", projection["claim"]["work_item_id"])
+        self.assertEqual([], projection["claim"]["blockers"])
+        self.assertEqual(
+            "tests/selected-preflight-evidence",
+            projection["claim"]["evidence"][0]["reference"],
+        )
+        self.assertNotIn("unrelated-journey", rendered)
+        self.assertNotIn("test-00002", rendered)
+        self.assertNotIn(sentinel, rendered)
+        self.assertEqual(
+            ["registry.json", "claims/index.json", "claims/selected-journey.json"],
+            reads,
+        )
+        self.assertNotIn("claims/unrelated-journey.json", reads)
+        self.assertNotIn("archive/unrelated-journey/test-99999.json", reads)
+        self.assertEqual(before, self.snapshot())
 
     def test_target_and_work_item_retrieval_return_only_exact_current_records(self) -> None:
         self.write_item("active", "test-00001", "first-journey", "staging_verified")
