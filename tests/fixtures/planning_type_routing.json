@@ -1,0 +1,55 @@
+[
+  {
+    "name": "explicit type wins",
+    "inputs": {
+      "explicit": "research",
+      "owner_produced": "sprint",
+      "consumer_convention": "feature-development",
+      "clear_inference": "bounded-outcome"
+    },
+    "expected_type": "research",
+    "expected_source": "explicit"
+  },
+  {
+    "name": "owner-produced type precedes convention",
+    "inputs": {
+      "owner_produced": "sprint",
+      "consumer_convention": "feature-development",
+      "clear_inference": "bounded-outcome"
+    },
+    "expected_type": "sprint",
+    "expected_source": "owner-produced"
+  },
+  {
+    "name": "consumer convention precedes inference",
+    "inputs": {
+      "consumer_convention": "feature-development",
+      "clear_inference": "research"
+    },
+    "expected_type": "feature-development",
+    "expected_source": "consumer-convention"
+  },
+  {
+    "name": "clear outcome evidence selects relative type",
+    "inputs": {
+      "clear_inference": "research"
+    },
+    "expected_type": "research",
+    "expected_source": "clear-inference"
+  },
+  {
+    "name": "material ambiguity remains unresolved",
+    "inputs": {
+      "clear_inference": "feature-development",
+      "materially_ambiguous": true
+    },
+    "expected_type": null,
+    "expected_source": "unresolved"
+  },
+  {
+    "name": "thin default needs no consumer files",
+    "inputs": {},
+    "expected_type": "bounded-outcome",
+    "expected_source": "default"
+  }
+]

@@ -35,6 +35,24 @@ Use `must` only for an invariant required by safety, authority, or a cross-stage
 - Do not use execution success, command exit status, or a generated artifact as a synonym for acceptance.
 - Route invalid assumptions or material divergence to bounded replanning; do not silently retry with expanded scope.
 
+## Planning types and consumer conventions
+
+- Keep universal planning guardrails in the shared planning contract. A planning type may refine proposal shape, decomposition, or verification guidance but must not duplicate or weaken those guardrails.
+- Store substantial planning types under `delivery-planning/references/planning-types/` and load only the selected type.
+- Select a planning type from explicit user intent, owner-produced planning state, applicable consumer conventions, or clear outcome evidence, in that order. Use the bounded-outcome default when no specialized type materially improves the proposal.
+- Ask about the type only when ambiguity would materially change commitment, decomposition, authority, or persistence.
+- Treat consumer `CONVENTIONS.md` or an equivalent owner-produced contract as the home for methodology preferences, terminology, type-selection rules, decomposition thresholds, and adapter choices.
+- Do not turn one consumer's convention into a package-wide default.
+
+## Consumer-relative artifacts
+
+- Advisory Delivery requires no repository-local configuration or planning tree.
+- Persist only after an explicit request and within granted filesystem authority.
+- Resolve adapter paths relative to the consumer root, never the installed skill package, and reject paths that escape the consumer boundary.
+- Treat `_notes/plans/**` as a compatibility projection, not a universal layout or canonical runtime state.
+- Do not require `_notes/DELIVERY.md`; prefer consumer conventions for ordinary customization and introduce structured configuration only for a demonstrated machine-readable need.
+- Keep Delivery Spine manifests separate from general configuration because they retain optional operational journey evidence. Their existence must remain conditional on Delivery Spine use.
+
 ## References and tests
 
 - A reference has one contract owner and a clear reason to be loaded from `SKILL.md`.

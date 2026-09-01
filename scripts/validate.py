@@ -28,6 +28,13 @@ ASSESSMENTS = (
     "NEEDS_REPLAN",
 )
 LINK_PATTERN = re.compile(r"\[[^]]+\]\(([^)]+)\)")
+DEFAULT_PLANNING_TYPE = "bounded-outcome"
+PLANNING_REFERENCES = (
+    "references/planning-contract.md",
+    "references/planning-type-routing.md",
+    "references/consumer-conventions.md",
+    "references/planning-types/bounded-outcome.md",
+)
 
 
 def frontmatter(text: str) -> dict[str, str]:
@@ -45,6 +52,29 @@ def frontmatter(text: str) -> dict[str, str]:
     return fields
 
 
+def select_planning_type(
+    *,
+    explicit: str | None = None,
+    owner_produced: str | None = None,
+    consumer_convention: str | None = None,
+    clear_inference: str | None = None,
+    materially_ambiguous: bool = False,
+) -> tuple[str | None, str]:
+    """Model the documented planning-type precedence for contract fixtures."""
+    for source, value in (
+        ("explicit", explicit),
+        ("owner-produced", owner_produced),
+        ("consumer-convention", consumer_convention),
+    ):
+        if value:
+            return value, source
+    if materially_ambiguous:
+        return None, "unresolved"
+    if clear_inference:
+        return clear_inference, "clear-inference"
+    return DEFAULT_PLANNING_TYPE, "default"
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     skill_root = ROOT / "skills"
@@ -54,7 +84,8 @@ def validate() -> list[str]:
 
     texts: dict[str, str] = {}
     for name in SKILLS:
-        entrypoint = skill_root / name / "SKILL.md"
+        package = skill_root / name
+        entrypoint = package / "SKILL.md"
         if not entrypoint.is_file():
             errors.append(f"{name}: missing SKILL.md")
             continue
@@ -66,14 +97,24 @@ def validate() -> list[str]:
         description = fields.get("description", "")
         if not description or len(description) > 1024:
             errors.append(f"{name}: description must contain 1-1024 characters")
-        for target in LINK_PATTERN.findall(text):
-            if "://" in target or target.startswith("#"):
-                continue
-            resolved = (entrypoint.parent / target.split("#", 1)[0]).resolve()
-            if not resolved.is_file():
-                errors.append(f"{name}: unresolved link {target}")
-            elif entrypoint.parent.resolve() not in resolved.parents:
-                errors.append(f"{name}: package link escapes its installable directory: {target}")
+        for source in package.rglob("*.md"):
+            source_text = source.read_text(encoding="utf-8")
+            for target in LINK_PATTERN.findall(source_text):
+                if "://" in target or target.startswith("#"):
+                    continue
+                resolved = (source.parent / target.split("#", 1)[0]).resolve()
+                relative_source = source.relative_to(package)
+                if not resolved.is_file():
+                    errors.append(f"{name}: {relative_source} has unresolved link {target}")
+                elif package.resolve() not in resolved.parents:
+                    errors.append(
+                        f"{name}: {relative_source} link escapes its installable directory: {target}"
+                    )
+
+    planning_package = skill_root / "delivery-planning"
+    for relative in PLANNING_REFERENCES:
+        if not (planning_package / relative).is_file():
+            errors.append(f"delivery-planning: missing {relative}")
 
     router = texts.get("deliver-product", "")
     for lane in CORE_SKILLS[1:]:

@@ -44,6 +44,26 @@ context-governance ──X──► delivery
 
 Context Governance remains independently usable. Delivery must still operate when Context Governance is absent by relying on explicit user and repository constraints and by stating the missing governed context.
 
+Delivery composes its procedure in this order:
+
+```text
+explicit request + owner-produced state
+                  │
+                  ▼
+          thin stage router
+                  │
+                  ▼
+           tiny stage skill
+                  │
+                  ▼
+     consumer conventions/contracts
+                  │
+                  ▼
+ optional consumer-relative adapter
+```
+
+The skills own thin, reusable guardrails. Consumer conventions and contracts customize terminology, planning-type preferences, decomposition rules, and local projections without replacing those guardrails. An adapter is loaded only when the selected work requires its representation or effect.
+
 ## Repository and skill boundaries
 
 The repository boundary and the skill boundary serve different purposes:
@@ -55,12 +75,14 @@ The repository boundary and the skill boundary serve different purposes:
 
 The repository root is not itself a skill. Each package entrypoint belongs at `skills/<skill-name>/SKILL.md` and must be independently discoverable and installable.
 
+`delivery-planning` may grow a library of planning types under package-local references. Its entrypoint and shared planning contract remain small; it loads only the selected planning type. New planning types refine proposal shape and reasoning without duplicating authority, evidence, persistence, or ownership rules.
+
 ## Ownership model
 
 | Layer | Owns | Does not own |
 | --- | --- | --- |
 | Context Governance | Durable Decisions, Conventions, Constraints, Git Governance, Version Governance, and bounded governance-context resolution | Delivery lifecycle or consumer runtime state |
-| Delivery Planning | Outcome interpretation, proposal preparation, decomposition, plan guidance, WorkItem definitions, dependencies, and replanning procedure | Approval, canonical Plan state, or accepted governance records |
+| Delivery Planning | Outcome interpretation, planning-type selection, proposal preparation, decomposition, plan guidance, WorkItem definitions, dependencies, and replanning procedure | Consumer methodology policy, approval, canonical Plan state, or accepted governance records |
 | Delivery Execution | Resolution and performance of exact ready work, bounded attempts, results, and evidence capture | Readiness inference, canonical Execution records, or WorkItem transitions |
 | Delivery Reconciliation | Criteria-versus-evidence assessment, divergence detection, and next-action recommendation | Canonical completion, acceptance, Plan state, or WorkItem state |
 | Delivery Spine | Registered journey shaping, integration preflight, impact selection, evidence-level validation, and deterministic gates | Roadmap direction, lifecycle transitions, deployment authority, or broad audit |
@@ -105,13 +127,13 @@ The router must not infer Plan approval, WorkItem readiness, execution success, 
 
 ### `delivery-planning`
 
-**Inputs:** requested outcome, applicable governed context, current-state evidence, constraints, and consumer planning contracts.
+**Inputs:** requested outcome, applicable governed context, current-state evidence, constraints, owner-produced planning state, and applicable consumer conventions or planning contracts.
 
-**Behavior:** prepare bounded alternatives and assumptions, decompose selected work, define success criteria and dependencies, and represent blockers or replanning needs.
+**Behavior:** select one relative planning type from explicit intent, owner-produced state, consumer conventions, or clear outcome evidence; otherwise use the thin bounded-outcome default. Prepare bounded alternatives and assumptions, decompose selected work, define success criteria and dependencies, and represent blockers or replanning needs.
 
 **Outputs:** a PlanningProposal, Plan draft guidance, WorkItem definitions, or repository-local planning artifacts supported by the consumer.
 
-**Boundary:** may identify a governance question but must route its acceptance to Context Governance or another owner. It does not approve plans or create canonical runtime state.
+**Boundary:** planning types may refine procedure but cannot weaken the shared guardrails. Planning may identify a governance question but must route its acceptance to Context Governance or another owner. It does not approve plans, create canonical runtime state, or require a repository-local planning layout.
 
 ### `delivery-execution`
 
@@ -164,21 +186,15 @@ Reconciliation must detect more than command failure. It covers missing verifica
 
 ## Local artifacts and runtime state
 
-Repository-local `_notes/plans/**` files are planning artifacts and human or agent working projections. They are not canonical runtime state.
+Delivery requires no repository-local configuration or planning files for advisory work. The skills supply safe defaults; consumers should place methodology preferences, planning-type rules, and adapter choices in their own `CONVENTIONS.md` or equivalent owner-produced contract.
 
-Delivery configuration should move toward `_notes/DELIVERY.md`, separate from durable `_notes/GOVERNANCE.md` configuration:
+Persistence is a separate, authorized operation. When requested, Delivery uses the consumer-selected adapter and resolves configured paths relative to the consumer root. A path must not be invented, interpreted relative to the skill package, or allowed to escape the consumer boundary.
 
-```text
-_notes/
-├── GOVERNANCE.md
-├── DELIVERY.md
-├── decisions/
-├── conventions/
-├── constraints/
-└── plans/
-```
+Repository-local `_notes/plans/**` files are one supported compatibility projection. They are planning artifacts and human or agent working projections, not canonical runtime state or a required layout. The extraction must preserve current `project_key` and legacy plan compatibility before attempting broader identity changes.
 
-The extraction must preserve current `project_key` and legacy plan compatibility before attempting broader identity changes.
+`_notes/DELIVERY.md` is not a required target. A consumer may adopt an optional structured Delivery configuration only when its conventions cannot express a machine-readable need. Its presence never creates authority or canonical state.
+
+`_notes/delivery-spine.json` remains separate because it is an optional, machine-validated operational projection of registered journeys, evidence, and blockers rather than general Delivery configuration. The Delivery Spine owns a thin default location for its current adapter; consumer-relative customization requires an explicit supported adapter or argument. Consumers that do not use Delivery Spine need no manifest.
 
 ## Event-compatible vocabulary
 
@@ -198,8 +214,8 @@ These names remain conceptual until an owning runtime adopts an explicit event c
 ## Migration constraints
 
 1. Establish and test the four contracts before moving behavior.
-2. Port planning behavior and fixtures without running two authoritative validators.
-3. Preserve legacy `_notes/plans/**` inputs until the Delivery validator reads them safely.
+2. Port planning behavior and fixtures behind the thin planning contract without running two authoritative validators.
+3. Preserve legacy `_notes/plans/**` inputs as an optional compatibility adapter until the Delivery validator reads them safely.
 4. Keep temporary Context Governance compatibility as delegation, never duplicated policy.
 5. Remove the compatibility route only after consumer migration and one supported migration window.
 
@@ -212,6 +228,7 @@ The completed repository should expose one package-level validation entrypoint c
 | Layer | Required proof |
 | --- | --- |
 | Package structure | All four skills have valid metadata, bounded routing, and resolvable links. |
+| Planning-type routing | Explicit selection, owner-produced type, consumer convention, clear inference, material ambiguity, and bounded default cases preserve the documented precedence. |
 | Planning compatibility | Representative legacy Context Governance plans retain equivalent validation behavior. |
 | Stage contracts | Missing governance, conflicting governance, blocked constraints, immutable execution scope, and authority boundaries are handled explicitly. |
 | Reconciliation | Every assessment class is tested, and execution success without verification cannot complete work. |

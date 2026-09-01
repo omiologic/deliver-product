@@ -28,9 +28,13 @@ The packages remain independently installable so a consumer can load or invoke o
 
 Context Governance is a complementary but optional installation. When present, Delivery consumes its bounded governed context. When absent, Delivery relies on explicit user and repository constraints and reports that governed context was unavailable.
 
+The skills own thin default guardrails and use the consumer's conventions and contracts for planning preferences, terminology, and local adapters. Advisory Delivery requires no `_notes/DELIVERY.md` or `_notes/plans/**` tree. When persistence is explicitly requested, configured paths are resolved relative to the consumer, and repository-local records remain projections rather than canonical runtime state.
+
+Delivery Planning is designed to scale through selectively loaded planning-type references. Explicit user choice, owner-produced planning state, and consumer conventions take precedence; otherwise a clearly applicable type may be selected from the outcome, with a bounded-outcome fallback when no specialization is needed.
+
 ## Status
 
-The repository contains the first contract scaffold for all four core skills and an unchanged import of `delivery-spine` from its original system-local package. `scripts/validate.py` verifies package metadata, package-local links, core routing coverage, execution boundaries, and the reconciliation vocabulary. Planning compatibility, broader consumer integration fixtures, installation tooling, and migration from Context Governance remain future work.
+The repository contains the first contract scaffold for all four core skills and an unchanged import of `delivery-spine` from its original system-local package. Delivery Planning now documents thin planning-type routing, its bounded default, and consumer-convention customization. `scripts/validate.py` verifies package metadata, package-local links, core routing coverage, execution boundaries, and the reconciliation vocabulary. Planning compatibility, broader consumer integration fixtures, installation tooling, and migration from Context Governance remain future work.
 
 The imported `delivery-spine` contract still reflects its original consumer's current Context Governance ownership language. That compatibility gap is intentionally recorded rather than rewritten during the byte-for-byte import; it must be reconciled before the package is presented as fully aligned with this repository's target ownership model.
 
@@ -119,7 +123,7 @@ python3 -m unittest discover -s skills/delivery-spine/tests -v
 ## Initial delivery sequence
 
 1. Define the four skill contracts and architecture tests.
-2. Extract planning behavior from Context Governance while preserving compatibility.
+2. Extract planning behavior from Context Governance behind the thin planning contract while preserving optional local-projection compatibility.
 3. Narrow Context Governance to durable governance and bounded context resolution.
 4. Add Execution and Reconciliation, then build the thin `deliver-product` orchestrator.
 5. Migrate the first consumer and remove the temporary planning compatibility route after its supported window.
