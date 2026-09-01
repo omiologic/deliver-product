@@ -1,0 +1,188 @@
+[
+  {
+    "name": "successful continuation uses explicit owner snapshots",
+    "steps": [
+      {
+        "request": {"durable_work_required": true, "work_defined": false},
+        "owner_state": {},
+        "evidence": {},
+        "operation": {"kind": "advisory"},
+        "planning_inputs": {
+          "requested_outcome": "Expose catalog health",
+          "consumer_conventions": {"default_planning_type": "feature-development"}
+        }
+      },
+      {
+        "request": {"durable_work_required": true, "work_defined": true},
+        "owner_state": {
+          "execution_envelope": {
+            "exact_work_item_selected": true,
+            "canonical_approval": true,
+            "canonical_readiness": true,
+            "immutable_scope": true,
+            "acceptance_criteria_defined": true,
+            "context_assigned": true,
+            "capabilities_assigned": true,
+            "intended_effects": [{"name": "write repository files", "authorized": true}],
+            "contradictory_prerequisites": false,
+            "stale_scope": false
+          }
+        },
+        "evidence": {},
+        "operation": {"kind": "advisory"},
+        "execution_inputs": {"work_item": "catalog-00002"},
+        "execution_scenario": {
+          "envelope": {
+            "exact_work_item_selected": true,
+            "canonical_approval": true,
+            "canonical_readiness": true,
+            "immutable_scope": true,
+            "acceptance_criteria_defined": true,
+            "context_assigned": true,
+            "capabilities_assigned": true,
+            "intended_effects": [{"name": "write repository files", "authorized": true}],
+            "contradictory_prerequisites": false,
+            "stale_scope": false
+          },
+          "observation": {
+            "attempted_action": "implement catalog health endpoint",
+            "result": "endpoint and tests created",
+            "affected_targets": ["src/catalog.py", "tests/test_catalog.py"],
+            "evidence_references": ["tests/catalog-health.txt"],
+            "failures": [],
+            "blockers": []
+          }
+        },
+        "expected_execution_disposition": "handoff",
+        "expected_execution_diagnostics": []
+      },
+      {
+        "request": {"durable_work_required": true, "work_defined": true},
+        "owner_state": {},
+        "evidence": {"execution_results": true, "verification_evidence": true},
+        "operation": {"kind": "advisory"},
+        "reconciliation_inputs": {"work_item": "catalog-00002"},
+        "reconciliation_scenario": {
+          "criteria": [
+            {
+              "id": "health-response",
+              "evidence": {
+                "supporting": ["tests/catalog-health.txt"],
+                "contradicting": [],
+                "missing": false
+              }
+            }
+          ],
+          "facts": {},
+          "recommendation": {
+            "owner": "responsible person",
+            "action": "review-verified-outcome"
+          }
+        },
+        "expected_assessment": "SUCCESS",
+        "expected_reconciliation_diagnostics": []
+      }
+    ],
+    "expected_lanes": [
+      "delivery-planning",
+      "delivery-execution",
+      "delivery-reconciliation"
+    ],
+    "expected_diagnostics": []
+  },
+  {
+    "name": "divergence returns only affected scope to planning",
+    "steps": [
+      {
+        "request": {"durable_work_required": true, "work_defined": true},
+        "owner_state": {
+          "execution_envelope": {
+            "exact_work_item_selected": true,
+            "canonical_approval": true,
+            "canonical_readiness": true,
+            "immutable_scope": true,
+            "acceptance_criteria_defined": true,
+            "context_assigned": true,
+            "capabilities_assigned": true,
+            "intended_effects": [{"name": "write repository files", "authorized": true}],
+            "contradictory_prerequisites": false,
+            "stale_scope": false
+          }
+        },
+        "evidence": {},
+        "operation": {"kind": "advisory"},
+        "execution_inputs": {"work_item": "catalog-00003"},
+        "execution_scenario": {
+          "envelope": {
+            "exact_work_item_selected": true,
+            "canonical_approval": true,
+            "canonical_readiness": true,
+            "immutable_scope": true,
+            "acceptance_criteria_defined": true,
+            "context_assigned": true,
+            "capabilities_assigned": true,
+            "intended_effects": [{"name": "write repository files", "authorized": true}],
+            "contradictory_prerequisites": false,
+            "stale_scope": false
+          },
+          "observation": {
+            "attempted_action": "add catalog cache",
+            "result": "cache added with an unplanned public response change",
+            "affected_targets": ["src/catalog.py"],
+            "evidence_references": ["tests/catalog-regression.txt"],
+            "failures": [],
+            "blockers": []
+          }
+        },
+        "expected_execution_disposition": "handoff",
+        "expected_execution_diagnostics": []
+      },
+      {
+        "request": {"durable_work_required": true, "work_defined": true},
+        "owner_state": {},
+        "evidence": {"execution_results": true, "observed_changes": true},
+        "operation": {"kind": "advisory"},
+        "reconciliation_inputs": {"work_item": "catalog-00003"},
+        "reconciliation_scenario": {
+          "criteria": [
+            {
+              "id": "preserve-public-response",
+              "evidence": {
+                "supporting": [],
+                "contradicting": ["tests/catalog-regression.txt"],
+                "missing": false
+              }
+            }
+          ],
+          "facts": {"diverged": true},
+          "recommendation": {
+            "owner": "plan owner",
+            "action": "replan-affected-scope"
+          }
+        },
+        "expected_assessment": "DIVERGED",
+        "expected_reconciliation_diagnostics": []
+      },
+      {
+        "request": {"durable_work_required": true, "work_defined": true},
+        "owner_state": {
+          "reconciliation_complete": true,
+          "reconciliation_assessment": "DIVERGED"
+        },
+        "evidence": {},
+        "operation": {"kind": "advisory"},
+        "planning_inputs": {
+          "invalidated_assumption": "cache layer preserves the public response",
+          "affected_scope": ["catalog response serialization"],
+          "retained_evidence": ["tests/catalog-regression.txt"]
+        }
+      }
+    ],
+    "expected_lanes": [
+      "delivery-execution",
+      "delivery-reconciliation",
+      "delivery-planning"
+    ],
+    "expected_diagnostics": []
+  }
+]

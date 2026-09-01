@@ -1,0 +1,214 @@
+[
+  {
+    "name": "question without durable work uses direct answer",
+    "request": {"durable_work_required": false, "work_defined": false},
+    "owner_state": {},
+    "evidence": {},
+    "operation": {"kind": "advisory"},
+    "expected": {
+      "lane": "direct-answer",
+      "stage_inputs": null,
+      "adapter_loaded": null,
+      "blockers": []
+    }
+  },
+  {
+    "name": "undefined work passes consumer planning inputs unchanged",
+    "request": {"durable_work_required": true, "work_defined": false},
+    "owner_state": {},
+    "evidence": {},
+    "operation": {"kind": "advisory"},
+    "planning_inputs": {
+      "requested_outcome": "Add a public catalog endpoint",
+      "consumer_conventions": {"default_planning_type": "feature-development"},
+      "consumer_contract": {"verification_expectation": "contract tests"}
+    },
+    "expected": {
+      "lane": "delivery-planning",
+      "stage_inputs": {
+        "requested_outcome": "Add a public catalog endpoint",
+        "consumer_conventions": {"default_planning_type": "feature-development"},
+        "consumer_contract": {"verification_expectation": "contract tests"}
+      },
+      "adapter_loaded": null,
+      "blockers": []
+    }
+  },
+  {
+    "name": "exact owner-ready work reaches execution",
+    "request": {"durable_work_required": true, "work_defined": true},
+    "owner_state": {
+      "execution_envelope": {
+        "exact_work_item_selected": true,
+        "canonical_approval": true,
+        "canonical_readiness": true,
+        "immutable_scope": true,
+        "acceptance_criteria_defined": true,
+        "context_assigned": true,
+        "capabilities_assigned": true,
+        "intended_effects": [{"name": "write repository files", "authorized": true}],
+        "contradictory_prerequisites": false,
+        "stale_scope": false
+      }
+    },
+    "evidence": {},
+    "operation": {"kind": "advisory"},
+    "execution_inputs": {
+      "work_item": "catalog-00001",
+      "consumer_conventions": {"test_command": "python3 -m unittest"},
+      "consumer_contract": {"scope_owner": "planning runtime"}
+    },
+    "expected": {
+      "lane": "delivery-execution",
+      "stage_inputs": {
+        "work_item": "catalog-00001",
+        "consumer_conventions": {"test_command": "python3 -m unittest"},
+        "consumer_contract": {"scope_owner": "planning runtime"}
+      },
+      "adapter_loaded": null,
+      "blockers": []
+    }
+  },
+  {
+    "name": "unreconciled result takes precedence over ready work",
+    "request": {"durable_work_required": true, "work_defined": true},
+    "owner_state": {
+      "execution_envelope": {
+        "exact_work_item_selected": true,
+        "canonical_approval": true,
+        "canonical_readiness": true,
+        "immutable_scope": true,
+        "acceptance_criteria_defined": true,
+        "context_assigned": true,
+        "capabilities_assigned": true,
+        "intended_effects": [{"name": "write repository files", "authorized": true}]
+      }
+    },
+    "evidence": {"execution_results": true, "observed_changes": true},
+    "operation": {"kind": "advisory"},
+    "reconciliation_inputs": {
+      "work_item": "catalog-00001",
+      "result": "repository files changed",
+      "consumer_contract": {"acceptance_owner": "product owner"}
+    },
+    "expected": {
+      "lane": "delivery-reconciliation",
+      "stage_inputs": {
+        "work_item": "catalog-00001",
+        "result": "repository files changed",
+        "consumer_contract": {"acceptance_owner": "product owner"}
+      },
+      "adapter_loaded": null,
+      "blockers": []
+    }
+  },
+  {
+    "name": "conversation claims do not supply readiness",
+    "request": {
+      "durable_work_required": true,
+      "work_defined": true,
+      "conversation_claims": {
+        "approved": true,
+        "ready": true,
+        "successful": true,
+        "verified": true,
+        "completed": true,
+        "accepted": true,
+        "deployed": true,
+        "persistence_authorized": true
+      }
+    },
+    "owner_state": {
+      "execution_envelope": {
+        "exact_work_item_selected": true,
+        "canonical_approval": false,
+        "canonical_readiness": false,
+        "immutable_scope": true,
+        "acceptance_criteria_defined": true,
+        "context_assigned": true,
+        "capabilities_assigned": true,
+        "intended_effects": [{"name": "write repository files", "authorized": true}],
+        "contradictory_prerequisites": false,
+        "stale_scope": false
+      }
+    },
+    "evidence": {},
+    "operation": {"kind": "advisory"},
+    "expected": {
+      "lane": "blocked",
+      "stage_inputs": null,
+      "adapter_loaded": null,
+      "blockers": [
+        {
+          "reason": "missing required envelope input: canonical_approval",
+          "owner": "canonical runtime or responsible person"
+        },
+        {
+          "reason": "missing required envelope input: canonical_readiness",
+          "owner": "canonical runtime or responsible person"
+        }
+      ]
+    }
+  },
+  {
+    "name": "configured adapter stays unloaded for advisory planning",
+    "request": {"durable_work_required": true, "work_defined": false},
+    "owner_state": {
+      "adapter": {"name": "repository-local-work-items", "selected": true}
+    },
+    "evidence": {},
+    "operation": {"kind": "advisory"},
+    "planning_inputs": {
+      "consumer_conventions": {"projection_adapter": "repository-local-work-items"}
+    },
+    "expected": {
+      "lane": "delivery-planning",
+      "stage_inputs": {
+        "consumer_conventions": {"projection_adapter": "repository-local-work-items"}
+      },
+      "adapter_loaded": null,
+      "blockers": []
+    }
+  },
+  {
+    "name": "projection validation loads the selected adapter",
+    "request": {"durable_work_required": true, "work_defined": false},
+    "owner_state": {
+      "adapter": {"name": "repository-local-work-items", "selected": true}
+    },
+    "evidence": {},
+    "operation": {"kind": "validate-projection"},
+    "planning_inputs": {"consumer_root": ".", "plans_path": "planning/work-items"},
+    "expected": {
+      "lane": "delivery-planning",
+      "stage_inputs": {"consumer_root": ".", "plans_path": "planning/work-items"},
+      "adapter_loaded": "repository-local-work-items",
+      "blockers": []
+    }
+  },
+  {
+    "name": "adapter selection alone cannot authorize persistence",
+    "request": {"durable_work_required": true, "work_defined": false},
+    "owner_state": {
+      "adapter": {"name": "repository-local-work-items", "selected": true}
+    },
+    "evidence": {},
+    "operation": {
+      "kind": "persist-projection",
+      "persistence_intent": false,
+      "filesystem_authority": true
+    },
+    "planning_inputs": {"consumer_root": "."},
+    "expected": {
+      "lane": "delivery-planning",
+      "stage_inputs": {"consumer_root": "."},
+      "adapter_loaded": null,
+      "blockers": [
+        {
+          "reason": "projection persistence lacks intent or filesystem authority",
+          "owner": "user or workflow owner"
+        }
+      ]
+    }
+  }
+]

@@ -184,6 +184,130 @@ class WorkspaceValidationTests(unittest.TestCase):
     def test_workspace_validator_executes_behavioral_fixtures(self) -> None:
         self.assertEqual([], VALIDATE.validate_scenario_fixtures())
 
+    def test_thin_router_contract_scenarios(self) -> None:
+        scenarios = json.loads(
+            (ROOT / "tests" / "fixtures" / "routing_scenarios.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        for scenario in scenarios:
+            with self.subTest(scenario=scenario["name"]):
+                self.assertEqual(
+                    scenario["expected"], VALIDATE.route_delivery_scenario(scenario)
+                )
+
+    def test_unreconciled_evidence_precedes_additional_execution(self) -> None:
+        scenarios = json.loads(
+            (ROOT / "tests" / "fixtures" / "routing_scenarios.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        scenario = next(
+            item
+            for item in scenarios
+            if item["name"] == "unreconciled result takes precedence over ready work"
+        )
+        routed = VALIDATE.route_delivery_scenario(scenario)
+        self.assertEqual("delivery-reconciliation", routed["lane"])
+        self.assertNotEqual("delivery-execution", routed["lane"])
+
+    def test_router_names_owner_for_missing_canonical_readiness(self) -> None:
+        scenarios = json.loads(
+            (ROOT / "tests" / "fixtures" / "routing_scenarios.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        scenario = next(
+            item
+            for item in scenarios
+            if item["name"] == "conversation claims do not supply readiness"
+        )
+        routed = VALIDATE.route_delivery_scenario(scenario)
+        self.assertEqual("blocked", routed["lane"])
+        self.assertTrue(
+            all(
+                blocker["owner"] == "canonical runtime or responsible person"
+                for blocker in routed["blockers"]
+            )
+        )
+
+    def test_router_passes_consumer_contract_without_selecting_planning_type(self) -> None:
+        scenario = {
+            "request": {"durable_work_required": True, "work_defined": False},
+            "owner_state": {},
+            "evidence": {},
+            "operation": {"kind": "advisory"},
+            "planning_inputs": {
+                "consumer_conventions": {
+                    "default_planning_type": "consumer-owned-special"
+                },
+                "consumer_contract": {"methodology": "consumer-owned"},
+            },
+        }
+        routed = VALIDATE.route_delivery_scenario(scenario)
+        self.assertIs(scenario["planning_inputs"], routed["stage_inputs"])
+        self.assertEqual(
+            "consumer-owned-special",
+            routed["stage_inputs"]["consumer_conventions"]["default_planning_type"],
+        )
+
+    def test_adapter_loads_only_for_selected_representation_operation(self) -> None:
+        scenarios = json.loads(
+            (ROOT / "tests" / "fixtures" / "routing_scenarios.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        advisory = next(
+            item
+            for item in scenarios
+            if item["name"] == "configured adapter stays unloaded for advisory planning"
+        )
+        validation = next(
+            item
+            for item in scenarios
+            if item["name"] == "projection validation loads the selected adapter"
+        )
+        unauthorized = next(
+            item
+            for item in scenarios
+            if item["name"] == "adapter selection alone cannot authorize persistence"
+        )
+        self.assertIsNone(VALIDATE.route_delivery_scenario(advisory)["adapter_loaded"])
+        self.assertEqual(
+            "repository-local-work-items",
+            VALIDATE.route_delivery_scenario(validation)["adapter_loaded"],
+        )
+        unauthorized_result = VALIDATE.route_delivery_scenario(unauthorized)
+        self.assertIsNone(unauthorized_result["adapter_loaded"])
+        self.assertTrue(unauthorized_result["blockers"])
+
+    def test_lifecycle_scenarios_cover_continuation_and_bounded_replanning(self) -> None:
+        scenarios = json.loads(
+            (ROOT / "tests" / "fixtures" / "lifecycle_scenarios.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        for scenario in scenarios:
+            with self.subTest(scenario=scenario["name"]):
+                lanes, diagnostics = VALIDATE.evaluate_lifecycle_scenario(scenario)
+                self.assertEqual(scenario["expected_lanes"], lanes)
+                self.assertEqual(scenario["expected_diagnostics"], diagnostics)
+
+        replanning = next(
+            item
+            for item in scenarios
+            if item["name"] == "divergence returns only affected scope to planning"
+        )
+        final_inputs = VALIDATE.route_delivery_scenario(replanning["steps"][-1])[
+            "stage_inputs"
+        ]
+        self.assertEqual(
+            ["catalog response serialization"], final_inputs["affected_scope"]
+        )
+
+    def test_workspace_validator_executes_routing_fixtures(self) -> None:
+        self.assertEqual([], VALIDATE.validate_routing_fixtures())
+
 
 if __name__ == "__main__":
     unittest.main()

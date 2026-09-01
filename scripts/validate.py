@@ -60,6 +60,22 @@ SCENARIO_FIXTURES = (
     "execution_scenarios.json",
     "reconciliation_scenarios.json",
 )
+ROUTING_FIXTURES = (
+    "routing_scenarios.json",
+    "lifecycle_scenarios.json",
+)
+REPLAN_ASSESSMENTS = ("DIVERGED", "NEEDS_REPLAN")
+REPRESENTATION_OPERATIONS = ("persist-projection", "validate-projection")
+EXECUTION_INPUT_OWNERS = {
+    "exact_work_item_selected": "WorkItem owner or responsible person",
+    "canonical_approval": "canonical runtime or responsible person",
+    "canonical_readiness": "canonical runtime or responsible person",
+    "immutable_scope": "execution snapshot owner",
+    "acceptance_criteria_defined": "execution snapshot owner",
+    "context_assigned": "context owner",
+    "capabilities_assigned": "capability owner",
+    "intended_effects": "user, policy, or authorized operation",
+}
 PLANNING_REFERENCES = (
     "references/planning-contract.md",
     "references/planning-type-routing.md",
@@ -139,6 +155,125 @@ def projection_persistence_allowed(
 ) -> bool:
     """Model the three independent prerequisites for a planning projection write."""
     return adapter_selected and explicit_or_owner_produced_intent and filesystem_authority
+
+
+def _execution_blockers(diagnostics: list[str]) -> list[dict[str, str]]:
+    """Attach the responsible owner to execution-routing diagnostics."""
+    blockers: list[dict[str, str]] = []
+    for diagnostic in diagnostics:
+        if diagnostic.startswith("missing required envelope input: "):
+            field = diagnostic.rsplit(": ", 1)[1]
+            owner = EXECUTION_INPUT_OWNERS.get(field, "execution owner")
+        elif diagnostic.startswith("effect lacks explicit authority: "):
+            owner = "user, policy, or authorized operation"
+        elif diagnostic == "execution prerequisites are contradictory":
+            owner = "canonical runtime or responsible person"
+        elif diagnostic == "immutable execution scope is stale":
+            owner = "execution snapshot owner"
+        else:
+            owner = "execution owner"
+        blockers.append({"reason": diagnostic, "owner": owner})
+    return blockers
+
+
+def route_delivery_scenario(scenario: dict[str, Any]) -> dict[str, Any]:
+    """Select one thin-router lane and preserve the selected stage's inputs."""
+    request = scenario.get("request", {})
+    owner_state = scenario.get("owner_state", {})
+    evidence = scenario.get("evidence", {})
+    operation = scenario.get("operation", {})
+    if not all(isinstance(value, dict) for value in (request, owner_state, evidence, operation)):
+        return {
+            "lane": "blocked",
+            "stage_inputs": None,
+            "adapter_loaded": None,
+            "blockers": [
+                {"reason": "routing inputs must be objects", "owner": "request owner"}
+            ],
+        }
+
+    blockers: list[dict[str, str]] = []
+    has_unreconciled_evidence = any(
+        evidence.get(field) is True
+        for field in ("execution_results", "observed_changes", "verification_evidence")
+    )
+    if has_unreconciled_evidence:
+        lane = "delivery-reconciliation"
+        stage_inputs = scenario.get("reconciliation_inputs", {})
+    elif (
+        owner_state.get("reconciliation_complete") is True
+        and owner_state.get("reconciliation_assessment") in REPLAN_ASSESSMENTS
+    ):
+        lane = "delivery-planning"
+        stage_inputs = scenario.get("planning_inputs", {})
+    elif request.get("durable_work_required") is False:
+        lane = "direct-answer"
+        stage_inputs = None
+    elif request.get("durable_work_required") is not True:
+        lane = "blocked"
+        stage_inputs = None
+        blockers = [
+            {
+                "reason": "missing explicit durable-work routing intent",
+                "owner": "request owner",
+            }
+        ]
+    elif request.get("work_defined") is False:
+        lane = "delivery-planning"
+        stage_inputs = scenario.get("planning_inputs", {})
+    elif request.get("work_defined") is not True:
+        lane = "blocked"
+        stage_inputs = None
+        blockers = [
+            {
+                "reason": "missing owner-produced work definition state",
+                "owner": "WorkItem owner or responsible person",
+            }
+        ]
+    else:
+        envelope = owner_state.get("execution_envelope", {})
+        disposition, diagnostics = evaluate_execution_scenario(
+            {"envelope": envelope, "observation": None}
+        )
+        if disposition == "execute":
+            lane = "delivery-execution"
+            stage_inputs = scenario.get("execution_inputs", envelope)
+        elif disposition == "reconcile":
+            lane = "delivery-reconciliation"
+            stage_inputs = scenario.get("reconciliation_inputs", {})
+            blockers = _execution_blockers(diagnostics)
+        else:
+            lane = "blocked"
+            stage_inputs = None
+            blockers = _execution_blockers(diagnostics)
+
+    adapter = owner_state.get("adapter")
+    adapter_loaded: str | None = None
+    operation_kind = operation.get("kind", "advisory")
+    if lane == "delivery-planning" and operation_kind in REPRESENTATION_OPERATIONS:
+        if not isinstance(adapter, dict) or adapter.get("selected") is not True:
+            blockers.append(
+                {"reason": "representation operation requires a selected adapter", "owner": "consumer owner"}
+            )
+        elif operation_kind == "validate-projection":
+            adapter_loaded = adapter.get("name")
+        elif projection_persistence_allowed(
+            adapter_selected=True,
+            explicit_or_owner_produced_intent=operation.get("persistence_intent") is True,
+            filesystem_authority=operation.get("filesystem_authority") is True,
+        ):
+            adapter_loaded = adapter.get("name")
+        else:
+            blockers.append(
+                {"reason": "projection persistence lacks intent or filesystem authority", "owner": "user or workflow owner"}
+            )
+
+    return {
+        "lane": lane,
+        "stage_inputs": stage_inputs,
+        "adapter_loaded": adapter_loaded,
+        "blockers": blockers,
+    }
 
 
 def evaluate_execution_scenario(scenario: dict[str, Any]) -> tuple[str, list[str]]:
@@ -282,6 +417,228 @@ def assess_reconciliation_scenario(scenario: dict[str, Any]) -> tuple[str, list[
     return assessment, diagnostics
 
 
+def evaluate_lifecycle_scenario(scenario: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """Evaluate explicit lifecycle snapshots without synthesizing transitions."""
+    steps = scenario.get("steps")
+    if not isinstance(steps, list) or not steps:
+        return [], ["lifecycle scenario requires at least one explicit step"]
+
+    lanes: list[str] = []
+    diagnostics: list[str] = []
+    for index, step in enumerate(steps, start=1):
+        if not isinstance(step, dict):
+            diagnostics.append(f"lifecycle step {index} must be an object")
+            continue
+        routed = route_delivery_scenario(step)
+        lanes.append(routed["lane"])
+        if routed["blockers"] != step.get("expected_blockers", []):
+            diagnostics.append(f"lifecycle step {index} blockers differ from expectation")
+
+        if routed["lane"] == "delivery-execution":
+            execution_scenario = step.get("execution_scenario")
+            if isinstance(execution_scenario, dict):
+                disposition, execution_diagnostics = evaluate_execution_scenario(
+                    execution_scenario
+                )
+                if disposition != step.get("expected_execution_disposition"):
+                    diagnostics.append(
+                        f"lifecycle step {index} execution disposition was {disposition}"
+                    )
+                if execution_diagnostics != step.get("expected_execution_diagnostics", []):
+                    diagnostics.append(
+                        f"lifecycle step {index} execution diagnostics differ from expectation"
+                    )
+
+        if routed["lane"] == "delivery-reconciliation":
+            reconciliation_scenario = step.get("reconciliation_scenario")
+            if isinstance(reconciliation_scenario, dict):
+                assessment, reconciliation_diagnostics = assess_reconciliation_scenario(
+                    reconciliation_scenario
+                )
+                if assessment != step.get("expected_assessment"):
+                    diagnostics.append(
+                        f"lifecycle step {index} reconciliation assessment was {assessment}"
+                    )
+                if reconciliation_diagnostics != step.get(
+                    "expected_reconciliation_diagnostics", []
+                ):
+                    diagnostics.append(
+                        f"lifecycle step {index} reconciliation diagnostics differ from expectation"
+                    )
+
+    return lanes, diagnostics
+
+
+def validate_routing_fixtures() -> list[str]:
+    """Validate thin-router decisions and cross-stage lifecycle composition."""
+    errors: list[str] = []
+    fixture_root = ROOT / "tests" / "fixtures"
+
+    routing_path = fixture_root / ROUTING_FIXTURES[0]
+    try:
+        routing_scenarios = json.loads(routing_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        errors.append(f"{routing_path.name}: cannot load scenarios: {exc}")
+        routing_scenarios = []
+    if not isinstance(routing_scenarios, list):
+        errors.append(f"{routing_path.name}: fixture root must be a list")
+        routing_scenarios = []
+
+    observed_lanes: set[str] = set()
+    observed_reconciliation_precedence = False
+    observed_owned_blocker = False
+    observed_consumer_passthrough = False
+    observed_advisory_adapter_unloaded = False
+    observed_representation_adapter_loaded = False
+    observed_persistence_denied = False
+    observed_conversation_claims_blocked = False
+    for scenario in routing_scenarios:
+        if not isinstance(scenario, dict):
+            errors.append(f"{routing_path.name}: every scenario must be an object")
+            continue
+        name = scenario.get("name", "unnamed scenario")
+        actual = route_delivery_scenario(scenario)
+        expected = scenario.get("expected")
+        observed_lanes.add(actual["lane"])
+        if actual != expected:
+            errors.append(
+                f"{routing_path.name}: {name}: expected {expected}, observed {actual}"
+            )
+        request = scenario.get("request", {})
+        owner_state = scenario.get("owner_state", {})
+        evidence = scenario.get("evidence", {})
+        operation = scenario.get("operation", {})
+        envelope = owner_state.get("execution_envelope", {}) if isinstance(owner_state, dict) else {}
+        if (
+            actual["lane"] == "delivery-reconciliation"
+            and isinstance(envelope, dict)
+            and envelope.get("canonical_readiness") is True
+            and isinstance(evidence, dict)
+            and evidence.get("execution_results") is True
+        ):
+            observed_reconciliation_precedence = True
+        if actual["lane"] == "blocked" and actual["blockers"] and all(
+            blocker.get("owner") for blocker in actual["blockers"]
+        ):
+            observed_owned_blocker = True
+        if isinstance(actual["stage_inputs"], dict) and any(
+            field in actual["stage_inputs"]
+            for field in ("consumer_conventions", "consumer_contract")
+        ):
+            selected_inputs = {
+                "delivery-planning": scenario.get("planning_inputs"),
+                "delivery-execution": scenario.get("execution_inputs"),
+                "delivery-reconciliation": scenario.get("reconciliation_inputs"),
+            }.get(actual["lane"])
+            observed_consumer_passthrough = (
+                observed_consumer_passthrough or actual["stage_inputs"] is selected_inputs
+            )
+        adapter = owner_state.get("adapter") if isinstance(owner_state, dict) else None
+        operation_kind = operation.get("kind") if isinstance(operation, dict) else None
+        if (
+            isinstance(adapter, dict)
+            and adapter.get("selected") is True
+            and operation_kind == "advisory"
+            and actual["adapter_loaded"] is None
+        ):
+            observed_advisory_adapter_unloaded = True
+        if (
+            operation_kind == "validate-projection"
+            and isinstance(adapter, dict)
+            and actual["adapter_loaded"] == adapter.get("name")
+        ):
+            observed_representation_adapter_loaded = True
+        if (
+            operation_kind == "persist-projection"
+            and actual["adapter_loaded"] is None
+            and actual["blockers"]
+        ):
+            observed_persistence_denied = True
+        if (
+            isinstance(request, dict)
+            and request.get("conversation_claims")
+            and actual["lane"] == "blocked"
+        ):
+            observed_conversation_claims_blocked = True
+
+    required_lanes = {
+        "direct-answer",
+        "delivery-planning",
+        "delivery-execution",
+        "delivery-reconciliation",
+        "blocked",
+    }
+    if observed_lanes != required_lanes:
+        errors.append(
+            f"{routing_path.name}: scenarios must cover exactly {sorted(required_lanes)}"
+        )
+    routing_coverage = {
+        "reconciliation precedence over ready execution": observed_reconciliation_precedence,
+        "owner-attributed missing-state blocker": observed_owned_blocker,
+        "consumer convention or contract pass-through": observed_consumer_passthrough,
+        "configured adapter unloaded for advisory work": observed_advisory_adapter_unloaded,
+        "selected adapter loaded for a representation operation": observed_representation_adapter_loaded,
+        "adapter selection denied as persistence authority": observed_persistence_denied,
+        "conversation claims rejected as canonical state": observed_conversation_claims_blocked,
+    }
+    missing_routing_coverage = [
+        description for description, observed in routing_coverage.items() if not observed
+    ]
+    if missing_routing_coverage:
+        errors.append(
+            f"{routing_path.name}: missing routing coverage: "
+            + ", ".join(missing_routing_coverage)
+        )
+
+    lifecycle_path = fixture_root / ROUTING_FIXTURES[1]
+    try:
+        lifecycle_scenarios = json.loads(lifecycle_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        errors.append(f"{lifecycle_path.name}: cannot load scenarios: {exc}")
+        lifecycle_scenarios = []
+    if not isinstance(lifecycle_scenarios, list):
+        errors.append(f"{lifecycle_path.name}: fixture root must be a list")
+        lifecycle_scenarios = []
+
+    observed_sequences: set[tuple[str, ...]] = set()
+    for scenario in lifecycle_scenarios:
+        if not isinstance(scenario, dict):
+            errors.append(f"{lifecycle_path.name}: every scenario must be an object")
+            continue
+        name = scenario.get("name", "unnamed scenario")
+        lanes, diagnostics = evaluate_lifecycle_scenario(scenario)
+        expected_lanes = scenario.get("expected_lanes")
+        expected_diagnostics = scenario.get("expected_diagnostics", [])
+        observed_sequences.add(tuple(lanes))
+        if lanes != expected_lanes:
+            errors.append(
+                f"{lifecycle_path.name}: {name}: expected lanes {expected_lanes}, observed {lanes}"
+            )
+        if diagnostics != expected_diagnostics:
+            errors.append(
+                f"{lifecycle_path.name}: {name}: expected diagnostics "
+                f"{expected_diagnostics}, observed {diagnostics}"
+            )
+
+    required_sequences = {
+        (
+            "delivery-planning",
+            "delivery-execution",
+            "delivery-reconciliation",
+        ),
+        (
+            "delivery-execution",
+            "delivery-reconciliation",
+            "delivery-planning",
+        ),
+    }
+    if observed_sequences != required_sequences:
+        errors.append(
+            f"{lifecycle_path.name}: scenarios must cover continuation and replanning loops"
+        )
+    return errors
+
+
 def validate_scenario_fixtures() -> list[str]:
     """Run the public-safe behavioral fixtures as part of package validation."""
     errors: list[str] = []
@@ -355,6 +712,7 @@ def validate_scenario_fixtures() -> list[str]:
         errors.append(
             "reconciliation_scenarios.json: scenarios must cover exactly the closed assessment vocabulary"
         )
+    errors.extend(validate_routing_fixtures())
     return errors
 
 
