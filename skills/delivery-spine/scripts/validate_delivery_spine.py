@@ -21,6 +21,7 @@ ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 WORK_ITEM_DIRS = ("backlog", "ready", "active", "archived")
 BLOCKER_STATES = ("detected", "investigating", "owner_assigned", "waiting_for_human", "implementation_pending", "verified", "resumed")
 UNRESOLVED_BLOCKER_STATES = set(BLOCKER_STATES[:5])
+DEFAULT_MANIFEST_PATH = "_notes/delivery-spine.json"
 
 
 @dataclass(frozen=True)
@@ -130,8 +131,16 @@ def placeholder_paths(root: Path, item: WorkItem) -> list[str]:
     return sorted(set(found))
 
 
-def load_manifest(root: Path) -> tuple[dict[str, Any] | None, list[Diagnostic]]:
-    path = root / "_notes" / "delivery-spine.json"
+def resolve_manifest_path(root: Path, value: str) -> tuple[Path | None, list[Diagnostic]]:
+    if not safe_relative_path(value):
+        return None, [Diagnostic("error", value, "manifest path must be a relative POSIX path without traversal or backslashes")]
+    path = (root / PurePosixPath(value)).resolve(strict=False)
+    if not path.is_relative_to(root):
+        return None, [Diagnostic("error", value, "manifest path escapes the consumer root through a symlink")]
+    return path, []
+
+
+def load_manifest(path: Path) -> tuple[dict[str, Any] | None, list[Diagnostic]]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -360,6 +369,11 @@ def emit(diagnostics: list[Diagnostic]) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
+    parser.add_argument(
+        "--manifest-path",
+        default=DEFAULT_MANIFEST_PATH,
+        help=f"consumer-relative manifest path (default: {DEFAULT_MANIFEST_PATH})",
+    )
     parser.add_argument("--transition", choices=("start", "archive"))
     parser.add_argument("--work-item")
     parser.add_argument("--changed-path", action="append", default=[])
@@ -369,8 +383,12 @@ def main(argv: list[str] | None = None) -> int:
 
     root = args.root.resolve()
     items, diagnostics = load_work_items(root)
-    manifest, manifest_diagnostics = load_manifest(root)
-    diagnostics.extend(manifest_diagnostics)
+    manifest_path, path_diagnostics = resolve_manifest_path(root, args.manifest_path)
+    diagnostics.extend(path_diagnostics)
+    manifest: dict[str, Any] | None = None
+    if manifest_path is not None:
+        manifest, manifest_diagnostics = load_manifest(manifest_path)
+        diagnostics.extend(manifest_diagnostics)
     journeys: dict[str, dict[str, Any]] = {}
     if manifest is not None:
         journeys, found = validate_manifest(manifest, items)

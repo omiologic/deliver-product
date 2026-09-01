@@ -106,10 +106,19 @@ class DeliverySpineValidatorTests(unittest.TestCase):
         path = self.root / "_notes" / "plans" / lifecycle / f"{identity}.test.md"
         path.write_text(work_item(identity, journey_id, target, **kwargs), encoding="utf-8")
 
-    def write_manifest(self, active: str | None, journeys: list[dict]) -> None:
-        (self.root / "_notes" / "delivery-spine.json").write_text(
+    def write_manifest(self, active: str | None, journeys: list[dict], path: str = "_notes/delivery-spine.json") -> None:
+        manifest = self.root / path
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(
             json.dumps({"schema_version": 1, "active_staging_slice": active, "journeys": journeys}),
             encoding="utf-8",
+        )
+
+    def snapshot(self) -> list[tuple[str, bytes]]:
+        return sorted(
+            (str(path.relative_to(self.root)), path.read_bytes())
+            for path in self.root.rglob("*")
+            if path.is_file()
         )
 
     def run_cli(self, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -120,11 +129,37 @@ class DeliverySpineValidatorTests(unittest.TestCase):
             capture_output=True,
         )
 
-    def test_valid_active_source_complete_staging_slice(self) -> None:
+    def test_default_manifest_path_remains_supported(self) -> None:
         self.write_item("active", "test-00001", "test-journey", "staging_verified")
         self.write_manifest("test-journey", [journey("test-journey", "test-00001")])
         result = self.run_cli()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_custom_nested_manifest_path_is_consumer_relative(self) -> None:
+        self.write_item("active", "test-00001", "test-journey", "staging_verified")
+        self.write_manifest("test-journey", [journey("test-journey", "test-00001")], "operations/journeys/spine.json")
+        result = self.run_cli("--manifest-path", "operations/journeys/spine.json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_manifest_path_rejects_absolute_traversal_and_backslashes(self) -> None:
+        for configured_path in ("/tmp/delivery-spine.json", "../delivery-spine.json", "operations\\delivery-spine.json"):
+            with self.subTest(configured_path=configured_path):
+                result = self.run_cli("--manifest-path", configured_path)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("manifest path must be a relative POSIX path", result.stdout)
+
+    def test_manifest_path_rejects_symlink_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as outside:
+            (self.root / "operations").symlink_to(outside, target_is_directory=True)
+            result = self.run_cli("--manifest-path", "operations/delivery-spine.json")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("manifest path escapes the consumer root through a symlink", result.stdout)
+
+    def test_missing_configured_manifest_reports_resolved_consumer_path(self) -> None:
+        result = self.run_cli("--manifest-path", "operations/missing.json")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(str(self.root / "operations" / "missing.json"), result.stdout)
+        self.assertIn("cannot read manifest", result.stdout)
 
     def test_integrated_level_rejects_component_only_evidence(self) -> None:
         self.write_item("active", "test-00001", "test-journey", "staging_verified")
@@ -157,8 +192,11 @@ class DeliverySpineValidatorTests(unittest.TestCase):
         (target / "staging.example.json").write_text('{"endpoint":"REPLACE_WITH_ENDPOINT"}', encoding="utf-8")
         (target / "staging.json").write_text('{"endpoint":"https://staging.example.test"}', encoding="utf-8")
         self.write_manifest(None, [journey("test-journey", "test-00001", target="integrated")])
+        before = self.snapshot()
         result = self.run_cli("--transition", "start", "--work-item", "test-00001")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.snapshot(), before)
+        self.assertTrue((self.root / "_notes" / "plans" / "ready" / "test-00001.test.md").is_file())
 
     def test_start_rejects_second_staging_slice(self) -> None:
         self.write_item("active", "test-00001", "first-journey", "staging_verified")
@@ -180,8 +218,11 @@ class DeliverySpineValidatorTests(unittest.TestCase):
     def test_archive_accepts_staging_evidence_and_completed_record(self) -> None:
         self.write_item("active", "test-00001", "test-journey", "staging_verified", complete=True)
         self.write_manifest("test-journey", [journey("test-journey", "test-00001", current="staging_verified", evidence_class="staging_e2e")])
+        before = self.snapshot()
         result = self.run_cli("--transition", "archive", "--work-item", "test-00001")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.snapshot(), before)
+        self.assertTrue((self.root / "_notes" / "plans" / "active" / "test-00001.test.md").is_file())
 
     def test_archive_rejects_placeholder_completion_evidence(self) -> None:
         self.write_item("active", "test-00001", "test-journey", "staging_verified")

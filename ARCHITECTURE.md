@@ -165,7 +165,7 @@ The router must not infer Plan approval, WorkItem readiness, execution success, 
 
 **Boundary:** a gate result is evidence for an owner-controlled decision. It does not deploy, release, archive work, or replace Planning, Execution, or Reconciliation.
 
-The package was initially imported unchanged from its system-local source. Its existing statement that Context Governance owns local Plan and work-item lifecycle reflects that consumer's compatibility state, not this repository's target ownership model. Reconcile that language through an explicit contract change with its tests; do not reinterpret it implicitly.
+The package was initially imported unchanged from its system-local source. Its former Context-Governance-specific lifecycle wording was reconciled through the issue #5 compatibility change: start and archive now return read-only evidence for transitions controlled by the consumer runtime or responsible person.
 
 ## Evidence and completion
 

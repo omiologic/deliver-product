@@ -14,7 +14,7 @@ Add this section after `Context` and before `Scope`:
 - Integration consumer: self
 ```
 
-`Journey ID` must match `_notes/delivery-spine.json`. Use `none` only for source-only work that does not itself own a registered journey. `Integration consumer` is `self`, an exact work-item ID, or `none` when the source work has no downstream product journey.
+`Journey ID` must match the applicable journey manifest selected relative to the consumer root. Use `none` only for source-only work that does not itself own a registered journey. `Integration consumer` is `self`, an exact work-item ID, or `none` when the source work has no downstream product journey.
 
 Integrated and staging work also includes:
 
@@ -63,9 +63,13 @@ backlog so another ready staging prerequisite can own the sole slot.
 
 Fixtures may seed initial state. A fixture that replaces a claimed identity, transport, service, persistence, email, provider, or deployment boundary limits the evidence to `component` or `contract` for that boundary.
 
+## Gate authority
+
+Start and archive are read-only evidence gates for prospective transitions controlled by the consumer runtime or responsible person. Gate success means only that the checked evidence satisfies this contract at observation time. It never activates, archives, completes, deploys, releases, or approves work. Gate failure likewise records diagnostics without moving or changing lifecycle state. System DevOps retains environment configuration, deployment, promotion, and rollback authority.
+
 ## Completion rules
 
-Before a successful archive transition:
+Before returning successful archive-gate evidence:
 
 - every checkbox under `Acceptance criteria` and `Verification` is checked;
 - `Result` and `Evidence` contain actual non-placeholder completion text;
@@ -75,4 +79,4 @@ Before a successful archive transition:
 
 For a credentialed, destructive, or release-significant shared-environment journey, run the environment-qualified freshness preflight immediately before user interaction. A missing or mismatched receipt blocks current-source evidence. An explicitly requested stale-target diagnostic stays labeled diagnostic-only and cannot satisfy `integrated` or `staging_verified` evidence.
 
-Cancellation and supersession are separate Context Governance outcomes and do not claim successful delivery.
+Cancellation and supersession are separate owner-controlled outcomes and do not claim successful delivery.

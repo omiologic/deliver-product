@@ -1,6 +1,10 @@
 # Journey manifest contract
 
-`_notes/delivery-spine.json` is a compact operational projection of important user journeys. It is not a roadmap, Plan, lifecycle record, deployment manifest, or source of authorization.
+The journey manifest is an optional operational projection of important user journeys. It is not canonical runtime state, a roadmap, Plan, lifecycle record, deployment manifest, or source of authorization. Consumers that do not use Delivery Spine need no manifest.
+
+`_notes/delivery-spine.json` remains the default compatibility path. Consumers may select another path with `--manifest-path <relative-path>`; the validator resolves it relative to the supplied consumer root and rejects absolute paths, traversal, backslashes, and symlink escapes. Consumer conventions may select applicability and this invocation argument without being parsed or owned by Delivery Spine. Selecting a path or adapter grants no persistence, transition, deployment, or approval authority, and the validator remains read-only.
+
+A valid manifest is required only when an applicable Spine operation needs journey registration, impact mapping, or start/archive gate evidence. Keep it separate from general Delivery configuration; do not introduce `_notes/DELIVERY.md` for journey evidence.
 
 The authoritative structural shape is [delivery-spine.schema.json](delivery-spine.schema.json). Keep one entry per journey and only the fields required to answer:
 

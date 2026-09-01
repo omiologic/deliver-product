@@ -20,14 +20,14 @@ Choose the smallest applicable operation:
   the first missing producer to an exact work item, record the safe solution,
   human action, and exit evidence, then stop retries until that path changes.
 
-Read [delivery contract](references/delivery-contract.md) for shaping or completion. Read [manifest contract](references/manifest-contract.md) when creating or changing `_notes/delivery-spine.json`.
+Read [delivery contract](references/delivery-contract.md) for shaping or completion. Read [manifest contract](references/manifest-contract.md) when creating, selecting, or changing a journey manifest.
 
 Before a credentialed, destructive, or release-significant journey against a shared environment, read [deployment freshness](references/deployment-freshness.md). Require one retained receipt whose exact environment, deployable unit, endpoint, artifact, applicable public configuration, and source identities match the target under review. Stop on `STALE` or `UNKNOWN` unless the user explicitly requests a stale-target diagnostic; that diagnostic never raises the supported delivery level or proves current source. The check does not apply to source-only, component, contract, or local-loopback evidence and never authorizes deployment.
 
 ## Preserve owner boundaries
 
 - Roadmaps own intended outcomes and confidence, not runtime evidence.
-- Context Governance owns local Plan and work-item lifecycle. Delivery Spine supplies a required external gate; it never moves or archives work itself.
+- The consumer runtime or responsible person owns Plan and WorkItem lifecycle state and every transition. Delivery Spine supplies read-only evidence for a prospective transition; it never activates, completes, or archives work itself.
 - System DevOps owns environment configuration, promotion, rollback, and deployment readiness. Validation never authorizes a deployment.
 - System Audit owns broad gap analysis. Delivery Spine reviews only the selected journey and task-affected paths.
 - Documentation Maintenance owns the bounded completion-time documentation check.
@@ -51,6 +51,8 @@ An applicable work item claims integrated or staging behavior, introduces a depl
 
 Ordinary source-only work stays lightweight. If it contributes to a registered journey, name the downstream integration consumer; otherwise do not manufacture a journey.
 
+Consumers that do not use Delivery Spine need no manifest. Require a valid manifest only when an applicable Spine operation needs journey registration, impact mapping, or gate evidence. Consumer conventions may select applicability and the `--manifest-path` argument; Delivery Spine does not parse or own those conventions, and their selection grants no persistence or transition authority.
+
 ## Run deterministic gates
 
 From the repository root:
@@ -60,10 +62,11 @@ python3 skills/delivery-spine/scripts/validate_delivery_spine.py .
 python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --transition start --work-item <id>
 python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --transition archive --work-item <id>
 python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --changed-path <path> [--changed-path <path> ...]
+python3 skills/delivery-spine/scripts/validate_delivery_spine.py . --manifest-path <consumer-relative-path>
 python3 skills/delivery-spine/scripts/deployment_freshness.py check --receipt <path> --environment <name> --deployable-unit <name> --endpoint <https-url> --artifact-path <path> --source-path <path>
 ```
 
-Run the start gate before Context Governance moves applicable work from `ready` to `active`. Run the archive gate after completion evidence is written and before a successful move from `active` to `archived`. A failing gate blocks that transition but does not mutate any record.
+Run the start gate before the owning runtime or person considers moving applicable work from `ready` to `active`. Run the archive gate after completion evidence is written and before the owner considers moving it from `active` to `archived`. Both gates are read-only: success is evidence for a prospective owner-controlled transition, while failure is evidence against it. Neither result mutates a record or implies activation, archival, completion, deployment, release, or approval.
 
 For a blocker, inspect account/region, stack state, required non-placeholder
 configuration, exact receipt identities, and upstream plan ownership. Do not
