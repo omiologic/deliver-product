@@ -1,0 +1,7 @@
+interface:
+  display_name: "Delivery Spine"
+  short_description: "Keep delivery tied to real user journeys"
+  default_prompt: "Use $delivery-spine to shape or validate this work against one primary journey and the real evidence needed for its completion claim."
+
+policy:
+  allow_implicit_invocation: true
