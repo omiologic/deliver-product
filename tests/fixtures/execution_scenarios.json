@@ -1,0 +1,213 @@
+[
+  {
+    "name": "exact ready envelope may execute",
+    "envelope": {
+      "exact_work_item_selected": true,
+      "canonical_approval": true,
+      "canonical_readiness": true,
+      "immutable_scope": true,
+      "acceptance_criteria_defined": true,
+      "context_assigned": true,
+      "capabilities_assigned": true,
+      "intended_effects": [
+        {"name": "write repository files", "authorized": true}
+      ],
+      "contradictory_prerequisites": false,
+      "stale_scope": false
+    },
+    "observation": null,
+    "expected_disposition": "execute",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "missing exact selection blocks execution",
+    "envelope": {
+      "exact_work_item_selected": false,
+      "canonical_approval": true,
+      "canonical_readiness": true,
+      "immutable_scope": true,
+      "acceptance_criteria_defined": true,
+      "context_assigned": true,
+      "capabilities_assigned": true,
+      "intended_effects": [
+        {"name": "write repository files", "authorized": true}
+      ],
+      "contradictory_prerequisites": false,
+      "stale_scope": false
+    },
+    "observation": null,
+    "expected_disposition": "blocked",
+    "expected_diagnostics": [
+      "missing required envelope input: exact_work_item_selected"
+    ]
+  },
+  {
+    "name": "readiness and assignments are required",
+    "envelope": {
+      "exact_work_item_selected": true,
+      "canonical_approval": false,
+      "canonical_readiness": false,
+      "immutable_scope": true,
+      "acceptance_criteria_defined": true,
+      "context_assigned": false,
+      "capabilities_assigned": false,
+      "intended_effects": [
+        {"name": "write repository files", "authorized": true}
+      ],
+      "contradictory_prerequisites": false,
+      "stale_scope": false
+    },
+    "observation": null,
+    "expected_disposition": "blocked",
+    "expected_diagnostics": [
+      "missing required envelope input: canonical_approval",
+      "missing required envelope input: canonical_readiness",
+      "missing required envelope input: context_assigned",
+      "missing required envelope input: capabilities_assigned"
+    ]
+  },
+  {
+    "name": "scope and acceptance criteria are immutable inputs",
+    "envelope": {
+      "exact_work_item_selected": true,
+      "canonical_approval": true,
+      "canonical_readiness": true,
+      "immutable_scope": false,
+      "acceptance_criteria_defined": false,
+      "context_assigned": true,
+      "capabilities_assigned": true,
+      "intended_effects": [
+        {"name": "write repository files", "authorized": true}
+      ],
+      "contradictory_prerequisites": false,
+      "stale_scope": false
+    },
+    "observation": null,
+    "expected_disposition": "blocked",
+    "expected_diagnostics": [
+      "missing required envelope input: immutable_scope",
+      "missing required envelope input: acceptance_criteria_defined"
+    ]
+  },
+  {
+    "name": "every intended effect needs authority",
+    "envelope": {
+      "exact_work_item_selected": true,
+      "canonical_approval": true,
+      "canonical_readiness": true,
+      "immutable_scope": true,
+      "acceptance_criteria_defined": true,
+      "context_assigned": true,
+      "capabilities_assigned": true,
+      "intended_effects": [
+        {"name": "write repository files", "authorized": true},
+        {"name": "publish release", "authorized": false}
+      ],
+      "contradictory_prerequisites": false,
+      "stale_scope": false
+    },
+    "observation": null,
+    "expected_disposition": "blocked",
+    "expected_diagnostics": [
+      "effect lacks explicit authority: publish release"
+    ]
+  },
+  {
+    "name": "contradictory prerequisites block execution",
+    "envelope": {
+      "exact_work_item_selected": true,
+      "canonical_approval": true,
+      "canonical_readiness": true,
+      "immutable_scope": true,
+      "acceptance_criteria_defined": true,
+      "context_assigned": true,
+      "capabilities_assigned": true,
+      "intended_effects": [
+        {"name": "write repository files", "authorized": true}
+      ],
+      "contradictory_prerequisites": true,
+      "stale_scope": false
+    },
+    "observation": null,
+    "expected_disposition": "blocked",
+    "expected_diagnostics": [
+      "execution prerequisites are contradictory"
+    ]
+  },
+  {
+    "name": "stale scope is handed to reconciliation",
+    "envelope": {
+      "exact_work_item_selected": true,
+      "canonical_approval": true,
+      "canonical_readiness": true,
+      "immutable_scope": true,
+      "acceptance_criteria_defined": true,
+      "context_assigned": true,
+      "capabilities_assigned": true,
+      "intended_effects": [
+        {"name": "write repository files", "authorized": true}
+      ],
+      "contradictory_prerequisites": false,
+      "stale_scope": true
+    },
+    "observation": null,
+    "expected_disposition": "reconcile",
+    "expected_diagnostics": [
+      "immutable execution scope is stale"
+    ]
+  },
+  {
+    "name": "successful result remains distinct from evidence",
+    "envelope": {
+      "exact_work_item_selected": true,
+      "canonical_approval": true,
+      "canonical_readiness": true,
+      "immutable_scope": true,
+      "acceptance_criteria_defined": true,
+      "context_assigned": true,
+      "capabilities_assigned": true,
+      "intended_effects": [
+        {"name": "run repository validation", "authorized": true}
+      ],
+      "contradictory_prerequisites": false,
+      "stale_scope": false
+    },
+    "observation": {
+      "attempted_action": "run repository validation",
+      "result": "process exited with status zero",
+      "affected_targets": [],
+      "evidence_references": [],
+      "failures": [],
+      "blockers": []
+    },
+    "expected_disposition": "handoff",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "failed attempt and blocker are factual observations",
+    "envelope": {
+      "exact_work_item_selected": true,
+      "canonical_approval": true,
+      "canonical_readiness": true,
+      "immutable_scope": true,
+      "acceptance_criteria_defined": true,
+      "context_assigned": true,
+      "capabilities_assigned": true,
+      "intended_effects": [
+        {"name": "run integration verification", "authorized": true}
+      ],
+      "contradictory_prerequisites": false,
+      "stale_scope": false
+    },
+    "observation": {
+      "attempted_action": "run integration verification",
+      "result": "verification process did not start",
+      "affected_targets": [],
+      "evidence_references": ["logs/integration-attempt.txt"],
+      "failures": ["verification runner returned an error"],
+      "blockers": ["required test service unavailable"]
+    },
+    "expected_disposition": "handoff",
+    "expected_diagnostics": []
+  }
+]

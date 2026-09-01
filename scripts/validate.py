@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +37,29 @@ GOVERNED_CONTEXT_RESPONSES = {
     "conflicting": ("await-owner", "do-not-select-conflicting-context"),
     "blocking": ("blocked", "do-not-produce-ready-work"),
 }
+EXECUTION_ENVELOPE_FIELDS = (
+    "exact_work_item_selected",
+    "canonical_approval",
+    "canonical_readiness",
+    "immutable_scope",
+    "acceptance_criteria_defined",
+    "context_assigned",
+    "capabilities_assigned",
+)
+RECONCILIATION_RECOMMENDATIONS = {
+    "SUCCESS": "review-verified-outcome",
+    "PARTIAL": "address-remaining-criteria",
+    "FAILED": "review-failed-attempt",
+    "BLOCKED": "resolve-blocker",
+    "STALE": "refresh-execution-snapshot",
+    "DIVERGED": "replan-affected-scope",
+    "SUPERSEDED": "review-owner-replacement",
+    "NEEDS_REPLAN": "replan-affected-scope",
+}
+SCENARIO_FIXTURES = (
+    "execution_scenarios.json",
+    "reconciliation_scenarios.json",
+)
 PLANNING_REFERENCES = (
     "references/planning-contract.md",
     "references/planning-type-routing.md",
@@ -116,6 +141,223 @@ def projection_persistence_allowed(
     return adapter_selected and explicit_or_owner_produced_intent and filesystem_authority
 
 
+def evaluate_execution_scenario(scenario: dict[str, Any]) -> tuple[str, list[str]]:
+    """Evaluate an execution envelope without creating lifecycle state."""
+    envelope = scenario.get("envelope", {})
+    if not isinstance(envelope, dict):
+        return "blocked", ["execution envelope must be an object"]
+    observation = scenario.get("observation")
+    diagnostics: list[str] = []
+
+    for field in EXECUTION_ENVELOPE_FIELDS:
+        if envelope.get(field) is not True:
+            diagnostics.append(f"missing required envelope input: {field}")
+
+    intended_effects = envelope.get("intended_effects")
+    if not isinstance(intended_effects, list) or not intended_effects:
+        diagnostics.append("missing required envelope input: intended_effects")
+    else:
+        for effect in intended_effects:
+            name = (
+                effect.get("name", "unnamed effect")
+                if isinstance(effect, dict)
+                else "unnamed effect"
+            )
+            if not isinstance(effect, dict) or effect.get("authorized") is not True:
+                diagnostics.append(f"effect lacks explicit authority: {name}")
+
+    if envelope.get("contradictory_prerequisites") is True:
+        diagnostics.append("execution prerequisites are contradictory")
+
+    if envelope.get("stale_scope") is True:
+        diagnostics.append("immutable execution scope is stale")
+        if len(diagnostics) == 1:
+            return "reconcile", diagnostics
+
+    if diagnostics:
+        return "blocked", diagnostics
+
+    if observation is None:
+        return "execute", []
+    if not isinstance(observation, dict):
+        return "blocked", ["execution observation must be an object"]
+
+    required_observation_fields = (
+        "attempted_action",
+        "result",
+        "affected_targets",
+        "evidence_references",
+        "failures",
+        "blockers",
+    )
+    for field in required_observation_fields:
+        if field not in observation:
+            diagnostics.append(f"execution observation missing field: {field}")
+    if not observation.get("attempted_action"):
+        diagnostics.append("execution observation requires an attempted action")
+    for field in ("affected_targets", "evidence_references", "failures", "blockers"):
+        if field in observation and not isinstance(observation[field], list):
+            diagnostics.append(f"execution observation field must be a list: {field}")
+
+    return ("blocked" if diagnostics else "handoff"), diagnostics
+
+
+def assess_reconciliation_scenario(scenario: dict[str, Any]) -> tuple[str, list[str]]:
+    """Classify criterion evidence and return diagnostics for an advisory assessment."""
+    diagnostics: list[str] = []
+    criteria = scenario.get("criteria")
+    if not isinstance(criteria, list) or not criteria:
+        return "BLOCKED", ["reconciliation requires at least one acceptance criterion"]
+
+    supported = 0
+    unresolved = 0
+    for criterion in criteria:
+        if not isinstance(criterion, dict) or not criterion.get("id"):
+            diagnostics.append("criterion requires a stable id")
+            unresolved += 1
+            continue
+        evidence = criterion.get("evidence")
+        if not isinstance(evidence, dict):
+            diagnostics.append(f"criterion {criterion['id']} requires attributable evidence")
+            unresolved += 1
+            continue
+        supporting = evidence.get("supporting")
+        contradicting = evidence.get("contradicting")
+        missing = evidence.get("missing")
+        if (
+            not isinstance(supporting, list)
+            or not isinstance(contradicting, list)
+            or not isinstance(missing, bool)
+        ):
+            diagnostics.append(
+                f"criterion {criterion['id']} evidence must classify supporting, contradicting, and missing"
+            )
+            unresolved += 1
+            continue
+        if missing and (supporting or contradicting):
+            diagnostics.append(f"criterion {criterion['id']} cannot be missing and attributable")
+            unresolved += 1
+            continue
+        if not missing and not supporting and not contradicting:
+            diagnostics.append(f"criterion {criterion['id']} has no attributable evidence classification")
+            unresolved += 1
+            continue
+        if supporting and not contradicting and not missing:
+            supported += 1
+        else:
+            unresolved += 1
+
+    facts = scenario.get("facts", {})
+    if not isinstance(facts, dict):
+        facts = {}
+        diagnostics.append("reconciliation facts must be an object")
+    if facts.get("superseded") is True:
+        assessment = "SUPERSEDED"
+    elif facts.get("diverged") is True or facts.get("material_unintended_effects") is True:
+        assessment = "DIVERGED"
+    elif facts.get("needs_replan") is True:
+        assessment = "NEEDS_REPLAN"
+    elif facts.get("stale") is True:
+        assessment = "STALE"
+    elif facts.get("blocked") is True:
+        assessment = "BLOCKED"
+    elif facts.get("attempt_failed") is True:
+        assessment = "FAILED"
+    elif supported == len(criteria) and unresolved == 0 and not diagnostics:
+        assessment = "SUCCESS"
+    elif supported > 0:
+        assessment = "PARTIAL"
+    else:
+        assessment = "BLOCKED"
+
+    recommendation = scenario.get("recommendation")
+    if not isinstance(recommendation, dict) or not recommendation.get("owner"):
+        diagnostics.append("recommendation requires an owner")
+    elif recommendation.get("action") != RECONCILIATION_RECOMMENDATIONS[assessment]:
+        diagnostics.append(
+            f"assessment {assessment} requires bounded recommendation "
+            f"{RECONCILIATION_RECOMMENDATIONS[assessment]}"
+        )
+
+    return assessment, diagnostics
+
+
+def validate_scenario_fixtures() -> list[str]:
+    """Run the public-safe behavioral fixtures as part of package validation."""
+    errors: list[str] = []
+    fixture_root = ROOT / "tests" / "fixtures"
+    execution_dispositions: set[str] = set()
+    execution_diagnostics: set[str] = set()
+    observed_assessments: set[str] = set()
+    observed_failure = False
+    observed_blocker = False
+    for filename in SCENARIO_FIXTURES:
+        path = fixture_root / filename
+        if not path.is_file():
+            errors.append(f"scenarios: missing tests/fixtures/{filename}")
+            continue
+        try:
+            scenarios = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"{filename}: cannot load scenarios: {exc}")
+            continue
+        if not isinstance(scenarios, list):
+            errors.append(f"{filename}: fixture root must be a list")
+            continue
+        for scenario in scenarios:
+            if not isinstance(scenario, dict):
+                errors.append(f"{filename}: every scenario must be an object")
+                continue
+            name = scenario.get("name", "unnamed scenario")
+            if filename == "execution_scenarios.json":
+                actual, diagnostics = evaluate_execution_scenario(scenario)
+                expected = scenario.get("expected_disposition")
+                execution_dispositions.add(actual)
+                execution_diagnostics.update(diagnostics)
+                observation = scenario.get("observation")
+                if isinstance(observation, dict):
+                    observed_failure = observed_failure or bool(observation.get("failures"))
+                    observed_blocker = observed_blocker or bool(observation.get("blockers"))
+            else:
+                actual, diagnostics = assess_reconciliation_scenario(scenario)
+                expected = scenario.get("expected_assessment")
+                observed_assessments.add(actual)
+            if actual != expected:
+                errors.append(f"{filename}: {name}: expected {expected}, observed {actual}")
+            expected_diagnostics = scenario.get("expected_diagnostics", [])
+            if diagnostics != expected_diagnostics:
+                errors.append(
+                    f"{filename}: {name}: expected diagnostics {expected_diagnostics}, "
+                    f"observed {diagnostics}"
+                )
+
+    if execution_dispositions != {"execute", "blocked", "reconcile", "handoff"}:
+        errors.append(
+            "execution_scenarios.json: scenarios must cover execute, blocked, reconcile, and handoff"
+        )
+    required_execution_diagnostics = {
+        *(f"missing required envelope input: {field}" for field in EXECUTION_ENVELOPE_FIELDS),
+        "effect lacks explicit authority: publish release",
+        "execution prerequisites are contradictory",
+        "immutable execution scope is stale",
+    }
+    missing_diagnostics = sorted(required_execution_diagnostics - execution_diagnostics)
+    if missing_diagnostics:
+        errors.append(
+            "execution_scenarios.json: missing envelope coverage: "
+            + ", ".join(missing_diagnostics)
+        )
+    if not observed_failure or not observed_blocker:
+        errors.append(
+            "execution_scenarios.json: scenarios must capture representative failures and blockers"
+        )
+    if observed_assessments != set(ASSESSMENTS):
+        errors.append(
+            "reconciliation_scenarios.json: scenarios must cover exactly the closed assessment vocabulary"
+        )
+    return errors
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     skill_root = ROOT / "skills"
@@ -181,6 +423,8 @@ def validate() -> list[str]:
             errors.append("delivery-reconciliation: success must require verification evidence")
     else:
         errors.append("delivery-reconciliation: missing assessment contract")
+
+    errors.extend(validate_scenario_fixtures())
 
     return errors
 

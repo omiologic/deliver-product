@@ -1,0 +1,95 @@
+[
+  {
+    "name": "all criteria verified",
+    "criteria": [
+      {"id": "criterion-1", "evidence": {"supporting": ["tests/unit.txt"], "contradicting": [], "missing": false}},
+      {"id": "criterion-2", "evidence": {"supporting": ["tests/integration.txt"], "contradicting": [], "missing": false}}
+    ],
+    "facts": {},
+    "recommendation": {"owner": "responsible person", "action": "review-verified-outcome"},
+    "expected_assessment": "SUCCESS",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "some criteria remain unverified",
+    "criteria": [
+      {"id": "criterion-1", "evidence": {"supporting": ["tests/unit.txt"], "contradicting": [], "missing": false}},
+      {"id": "criterion-2", "evidence": {"supporting": [], "contradicting": [], "missing": true}}
+    ],
+    "facts": {},
+    "recommendation": {"owner": "responsible person", "action": "address-remaining-criteria"},
+    "expected_assessment": "PARTIAL",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "bounded attempt failed",
+    "criteria": [
+      {"id": "criterion-1", "evidence": {"supporting": [], "contradicting": ["logs/failed-attempt.txt"], "missing": false}}
+    ],
+    "facts": {"attempt_failed": true},
+    "recommendation": {"owner": "execution owner", "action": "review-failed-attempt"},
+    "expected_assessment": "FAILED",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "dependency blocks verification",
+    "criteria": [
+      {"id": "criterion-1", "evidence": {"supporting": [], "contradicting": [], "missing": true}}
+    ],
+    "facts": {"blocked": true},
+    "recommendation": {"owner": "dependency owner", "action": "resolve-blocker"},
+    "expected_assessment": "BLOCKED",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "owner snapshot is stale",
+    "criteria": [
+      {"id": "criterion-1", "evidence": {"supporting": [], "contradicting": ["observations/current-interface.txt"], "missing": false}}
+    ],
+    "facts": {"stale": true},
+    "recommendation": {"owner": "work item owner", "action": "refresh-execution-snapshot"},
+    "expected_assessment": "STALE",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "result has a material unintended effect",
+    "criteria": [
+      {"id": "criterion-1", "evidence": {"supporting": ["tests/expected.txt"], "contradicting": [], "missing": false}},
+      {"id": "criterion-2", "evidence": {"supporting": [], "contradicting": ["tests/regression.txt"], "missing": false}}
+    ],
+    "facts": {"material_unintended_effects": true},
+    "recommendation": {"owner": "plan owner", "action": "replan-affected-scope"},
+    "expected_assessment": "DIVERGED",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "owner-produced replacement supersedes work",
+    "criteria": [
+      {"id": "criterion-1", "evidence": {"supporting": [], "contradicting": [], "missing": true}}
+    ],
+    "facts": {"superseded": true},
+    "recommendation": {"owner": "plan owner", "action": "review-owner-replacement"},
+    "expected_assessment": "SUPERSEDED",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "invalid assumption needs bounded replanning",
+    "criteria": [
+      {"id": "criterion-1", "evidence": {"supporting": [], "contradicting": ["observations/invalid-assumption.txt"], "missing": false}}
+    ],
+    "facts": {"needs_replan": true},
+    "recommendation": {"owner": "plan owner", "action": "replan-affected-scope"},
+    "expected_assessment": "NEEDS_REPLAN",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "successful operation without verification is not success",
+    "criteria": [
+      {"id": "criterion-1", "evidence": {"supporting": [], "contradicting": [], "missing": true}}
+    ],
+    "facts": {"operation_succeeded": true, "blocked": true},
+    "recommendation": {"owner": "verification owner", "action": "resolve-blocker"},
+    "expected_assessment": "BLOCKED",
+    "expected_diagnostics": []
+  }
+]

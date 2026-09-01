@@ -16,9 +16,8 @@ Skill invocation alone supplies none of these inputs.
 
 ## Observation record
 
-Capture the attempted action, result, affected targets, evidence location, and any failure or blocker. Preserve enough provenance for reconciliation to compare observations with each acceptance criterion.
+Capture the attempted action, result, affected targets, evidence references, failures, and blockers as distinct fields. Empty fields remain explicit so Reconciliation can distinguish an observed absence from an omitted observation. Preserve enough provenance for reconciliation to compare observations with each acceptance criterion.
 
 A zero exit status, successful API response, generated artifact, or completed tool call is a result. It becomes verification evidence only when it materially supports an explicit acceptance criterion.
 
 If scope, assumptions, or prerequisites become stale, stop and hand the observation to reconciliation. Do not silently retry with different scope or authority.
-

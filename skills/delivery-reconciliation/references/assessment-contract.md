@@ -20,10 +20,9 @@
 Provide:
 
 1. one assessment;
-2. each criterion and its supporting, contradicting, or missing evidence;
+2. each criterion and attributable supporting, contradicting, or explicitly missing evidence;
 3. unintended effects, drift, and uncertainty;
 4. a bounded recommendation and its owner; and
 5. evidence references with enough provenance for review.
 
-The output is advisory. It must not encode or perform a canonical WorkItem, Plan, or Execution transition.
-
+The recommendation names its owner and requests one bounded next action. The output is advisory. It must not encode or perform a canonical WorkItem, Plan, or Execution transition.
