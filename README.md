@@ -32,6 +32,33 @@ Context Governance is a complementary but optional installation. When present, D
 
 The skills own thin default guardrails and use the consumer's conventions and contracts for planning preferences, terminology, and local adapters. Advisory Delivery requires no `_notes/DELIVERY.md` or `_notes/plans/**` tree. When persistence is explicitly requested, configured paths are resolved relative to the consumer, and repository-local records remain projections rather than canonical runtime state. Delivery Spine supports bounded schema-v2 sharded retrieval while retaining a schema-v1 monolithic compatibility reader.
 
+## Search and context hygiene
+
+The skills do not require a particular text-search command. An agent may use `rg` while locating repository context, but searches should remain subordinate to explicit paths, owner-produced state, and bounded retrieval contracts.
+
+| Skill | Search pressure | Likely trigger |
+| --- | ---: | --- |
+| `deliver-product` | Low | Inspecting available evidence when exact references were not supplied. |
+| `delivery-planning` | High | Locating current-state evidence, governed context, repository constraints, or consumer conventions. |
+| `delivery-execution` | Medium–high | Finding implementation points, tests, usages, and local instructions within an authorized WorkItem scope. |
+| `delivery-reconciliation` | Medium | Locating attributable evidence for each acceptance criterion, including drift or unintended effects. |
+| `delivery-spine` | Low when its deterministic retrieval commands are used | Resolving exact journey, WorkItem, claim, evidence, or changed-path inputs; broad search is reserved for explicit audit. |
+
+Do not use repository text search to manufacture missing approval, readiness, completion, acceptance, or other canonical state. Prefer supplied paths and exact owner-produced references, search only when a required repository location is unknown, and use bounded deterministic adapters instead of broad textual discovery when available.
+
+Consumers that want this behavior in their own workspace can copy the following block into their `AGENTS.md` or `CONVENTIONS.md`:
+
+```markdown
+## Repository search and context hygiene
+
+- Use supplied paths and exact owner-produced references before searching repository text.
+- Search only when a required repository location is unknown; batch related discovery where practical and keep output bounded.
+- Do not use `rg` or another text search to manufacture missing approval, readiness, completion, acceptance, verification, or other canonical state. Report missing owner-produced state to its owner.
+- Prefer bounded deterministic adapters and changed-path inputs over broad textual discovery when they are available.
+- Keep searches within the authorized consumer or repository boundary and exclude generated, vendor, and unrelated workspace content unless explicitly in scope.
+- Treat search results as observations, not authority or evidence until the owning contract makes them attributable.
+```
+
 Delivery Planning is designed to scale through selectively loaded planning-type references. Explicit user choice, owner-produced planning state, and consumer conventions take precedence; otherwise a clearly applicable type may be selected from the outcome, with a bounded-outcome fallback when no specialization is needed.
 
 Validate the complete source workspace with `python3 scripts/validate.py`. Validate an independently installed package with the installed Skill validator against that package directory. The repository-local planning validator is separate and runs only after selecting that adapter: `python3 <delivery-planning-root>/scripts/validate_plans.py <consumer-root>`.

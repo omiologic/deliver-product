@@ -35,6 +35,15 @@ Use `must` only for an invariant required by safety, authority, or a cross-stage
 - Do not use execution success, command exit status, or a generated artifact as a synonym for acceptance.
 - Route invalid assumptions or material divergence to bounded replanning; do not silently retry with expanded scope.
 
+## Repository search and context hygiene
+
+- Use supplied paths and exact owner-produced references before searching repository text.
+- Search only when a required repository location is unknown; batch related discovery where practical and keep output bounded.
+- Do not use `rg` or another text search to manufacture missing approval, readiness, completion, acceptance, verification, or other canonical state. Report missing owner-produced state to its owner.
+- Prefer bounded deterministic adapters and changed-path inputs over broad textual discovery when they are available.
+- Keep searches within the authorized consumer or repository boundary and exclude generated, vendor, and unrelated workspace content unless explicitly in scope.
+- Treat search results as observations, not authority or evidence until the owning contract makes them attributable.
+
 ## Planning types and consumer conventions
 
 - Keep universal planning guardrails in the shared planning contract. A planning type may refine proposal shape, decomposition, or verification guidance but must not duplicate or weaken those guardrails.
