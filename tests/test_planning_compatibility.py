@@ -59,11 +59,20 @@ updated_at: "2026-08-24T10:00:00Z"
 
 
 class PlanningCompatibilityTests(unittest.TestCase):
-    def build(self, root: Path, mutation: str) -> None:
-        plans = root / "_notes" / "plans"
+    def build(
+        self,
+        root: Path,
+        mutation: str,
+        *,
+        plans_path: Path = VALIDATOR.DEFAULT_PLANS_PATH,
+        profile_path: Path = VALIDATOR.DEFAULT_PROFILE_PATH,
+    ) -> Path:
+        plans = root / plans_path
         for lifecycle in ("backlog", "ready", "active", "archived"):
             (plans / lifecycle).mkdir(parents=True, exist_ok=True)
-        (root / "_notes" / "GOVERNANCE.md").write_text(PROFILE, encoding="utf-8")
+        profile = root / profile_path
+        profile.parent.mkdir(parents=True, exist_ok=True)
+        profile.write_text(PROFILE, encoding="utf-8")
 
         lifecycle = "backlog" if mutation == "actionable-backlog" else "ready"
         work_id = {
@@ -87,6 +96,7 @@ class PlanningCompatibilityTests(unittest.TestCase):
             for name, links in sections.items()
         ) + "\n"
         (plans / "PLAN.md").write_text(index, encoding="utf-8")
+        return plans
 
     def test_frozen_legacy_diagnostics(self) -> None:
         scenarios = json.loads(
@@ -106,6 +116,88 @@ class PlanningCompatibilityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             diagnostics = VALIDATOR.validate_workspace(Path(temp))
         self.assertEqual(["missing _notes/plans directory"], [item.message for item in diagnostics])
+
+    def test_custom_consumer_relative_paths_validate(self) -> None:
+        plans_path = Path("planning/work-items")
+        profile_path = Path("config/planning-profile.md")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.build(
+                root,
+                "none",
+                plans_path=plans_path,
+                profile_path=profile_path,
+            )
+            diagnostics = VALIDATOR.validate_workspace(
+                root,
+                plans_path=plans_path,
+                profile_path=profile_path,
+            )
+        self.assertEqual([], diagnostics)
+
+    def test_absolute_and_traversing_adapter_paths_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            scenarios = (
+                {
+                    "plans_path": root / "plans",
+                    "profile_path": VALIDATOR.DEFAULT_PROFILE_PATH,
+                    "expected": "plans path must be consumer-relative",
+                },
+                {
+                    "plans_path": Path("../plans"),
+                    "profile_path": VALIDATOR.DEFAULT_PROFILE_PATH,
+                    "expected": "plans path escapes consumer root",
+                },
+                {
+                    "plans_path": VALIDATOR.DEFAULT_PLANS_PATH,
+                    "profile_path": root / "profile.md",
+                    "expected": "profile path must be consumer-relative",
+                },
+                {
+                    "plans_path": VALIDATOR.DEFAULT_PLANS_PATH,
+                    "profile_path": Path("../profile.md"),
+                    "expected": "profile path escapes consumer root",
+                },
+            )
+            for scenario in scenarios:
+                with self.subTest(expected=scenario["expected"]):
+                    diagnostics = VALIDATOR.validate_workspace(
+                        root,
+                        plans_path=scenario["plans_path"],
+                        profile_path=scenario["profile_path"],
+                    )
+                    self.assertEqual(
+                        [scenario["expected"]],
+                        [item.message for item in diagnostics],
+                    )
+
+    def test_symlinked_adapter_path_cannot_escape_consumer_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            root = base / "consumer"
+            outside = base / "outside"
+            root.mkdir()
+            outside.mkdir()
+            (root / "linked").symlink_to(outside, target_is_directory=True)
+
+            plans_diagnostics = VALIDATOR.validate_workspace(
+                root,
+                plans_path=Path("linked/plans"),
+            )
+            profile_diagnostics = VALIDATOR.validate_workspace(
+                root,
+                profile_path=Path("linked/profile.md"),
+            )
+
+        self.assertEqual(
+            ["plans path escapes consumer root"],
+            [item.message for item in plans_diagnostics],
+        )
+        self.assertEqual(
+            ["profile path escapes consumer root"],
+            [item.message for item in profile_diagnostics],
+        )
 
     def test_opaque_governance_sections_do_not_change_planning_profile(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -136,8 +228,7 @@ class PlanningCompatibilityTests(unittest.TestCase):
     def test_successful_archive_satisfies_ready_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            self.build(root, "none")
-            plans = root / "_notes" / "plans"
+            plans = self.build(root, "none")
             ready = next((plans / "ready").glob("*.md"))
             ready.write_text(
                 item_text(depends_on='\n  - "catalog-api-00001"'), encoding="utf-8"

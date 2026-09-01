@@ -43,6 +43,37 @@ class WorkspaceValidationTests(unittest.TestCase):
                 self.assertEqual(scenario["expected_type"], selected)
                 self.assertEqual(scenario["expected_source"], source)
 
+    def test_governed_context_scenarios(self) -> None:
+        fixtures = json.loads(
+            (ROOT / "tests" / "fixtures" / "governed_context.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        for scenario in fixtures:
+            with self.subTest(scenario=scenario["name"]):
+                action, handling = VALIDATE.planning_response_to_governed_context(
+                    scenario["owner_classification"]
+                )
+                self.assertEqual(scenario["expected_action"], action)
+                self.assertEqual(scenario["expected_handling"], handling)
+
+    def test_unknown_governed_context_classification_is_not_inferred(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unsupported governed-context classification"):
+            VALIDATE.planning_response_to_governed_context("delivery-inferred")
+
+    def test_projection_persistence_authority_scenarios(self) -> None:
+        fixtures = json.loads(
+            (ROOT / "tests" / "fixtures" / "persistence_authority.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        for scenario in fixtures:
+            with self.subTest(scenario=scenario["name"]):
+                self.assertEqual(
+                    scenario["expected"],
+                    VALIDATE.projection_persistence_allowed(**scenario["inputs"]),
+                )
+
     def test_reconciliation_has_closed_assessment_vocabulary(self) -> None:
         contract = (
             ROOT

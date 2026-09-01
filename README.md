@@ -14,15 +14,17 @@ The four core skills live in one repository because they form one lifecycle, sha
 
 ## Ecosystem installation
 
-Install all five skills together for the expected Delivery ecosystem behavior:
+Each installable package begins at its own repository directory:
 
-```text
-deliver-product
-delivery-planning
-delivery-execution
-delivery-reconciliation
-delivery-spine
-```
+| Package | Source directory |
+| --- | --- |
+| `deliver-product` | `skills/deliver-product/` |
+| `delivery-planning` | `skills/delivery-planning/` |
+| `delivery-execution` | `skills/delivery-execution/` |
+| `delivery-reconciliation` | `skills/delivery-reconciliation/` |
+| `delivery-spine` | `skills/delivery-spine/` |
+
+Install the five directories side by side through the consumer runtime's supported Skill installation mechanism for the expected Delivery ecosystem behavior. Preserve each package directory, including its `SKILL.md` and linked resources; the repository root is not an installable Skill.
 
 The packages remain independently installable so a consumer can load or invoke only the procedural context needed for a bounded task. However, a complete installation ensures that `deliver-product` can route across the full lifecycle, stage handoffs resolve consistently, reconciliation can return work to planning, and applicable cross-boundary delivery claims can use the Delivery Spine gates.
 
@@ -32,9 +34,11 @@ The skills own thin default guardrails and use the consumer's conventions and co
 
 Delivery Planning is designed to scale through selectively loaded planning-type references. Explicit user choice, owner-produced planning state, and consumer conventions take precedence; otherwise a clearly applicable type may be selected from the outcome, with a bounded-outcome fallback when no specialization is needed.
 
+Validate the complete source workspace with `python3 scripts/validate.py`. Validate an independently installed package with the installed Skill validator against that package directory. The repository-local planning validator is separate and runs only after selecting that adapter: `python3 <delivery-planning-root>/scripts/validate_plans.py <consumer-root>`.
+
 ## Status
 
-The repository contains the first contract scaffold for all four core skills and an unchanged import of `delivery-spine` from its original system-local package. Delivery Planning now provides thin planning-type routing, selectively loaded feature, sprint, research, and coordination procedures, and an optional repository-local compatibility adapter with dependency-free validation for legacy `_notes/plans/**` projections. `scripts/validate.py` verifies package metadata, package-local links, planning compatibility resources, core routing coverage, execution boundaries, and the reconciliation vocabulary. Broader consumer integration, installation tooling, and migration from Context Governance remain future work.
+The repository contains the first contract scaffold for all four core skills and an unchanged import of `delivery-spine` from its original system-local package. Delivery Planning now provides thin planning-type routing, selectively loaded feature, sprint, research, and coordination procedures, and an optional consumer-relative repository-local adapter with dependency-free validation and legacy `_notes/plans/**` defaults. `scripts/validate.py` verifies package metadata, package-local links, planning compatibility resources, core routing coverage, execution boundaries, and the reconciliation vocabulary. Broader consumer integration, installation tooling, and migration from Context Governance remain future work.
 
 The imported `delivery-spine` contract still reflects its original consumer's current Context Governance ownership language. That compatibility gap is intentionally recorded rather than rewritten during the byte-for-byte import; it must be reconciled before the package is presented as fully aligned with this repository's target ownership model.
 

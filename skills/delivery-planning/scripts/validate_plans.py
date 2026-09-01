@@ -36,6 +36,8 @@ CANONICAL_PATTERN = re.compile(
 RFC3339_PATTERN = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
 )
+DEFAULT_PLANS_PATH = Path("_notes/plans")
+DEFAULT_PROFILE_PATH = Path("_notes/GOVERNANCE.md")
 
 
 @dataclass(frozen=True)
@@ -43,6 +45,13 @@ class Diagnostic:
     severity: str
     path: Path
     message: str
+
+
+@dataclass(frozen=True)
+class AdapterPaths:
+    consumer_root: Path
+    plans_root: Path
+    profile_path: Path
 
 
 @dataclass
@@ -365,12 +374,22 @@ def _work_item(path: Path, plans_root: Path, profile: Profile | None) -> tuple[W
     return item, diagnostics
 
 
-def _validate_dimensions(item: WorkItem, profile: Profile | None) -> list[Diagnostic]:
+def _validate_dimensions(
+    item: WorkItem,
+    profile: Profile | None,
+    profile_label: str = "_notes/GOVERNANCE.md",
+) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     if profile is None:
         for field in DIMENSION_FIELDS.values():
             if field in item.fields:
-                diagnostics.append(Diagnostic("warning", item.path, f"legacy {field} has no _notes/GOVERNANCE.md catalog"))
+                diagnostics.append(
+                    Diagnostic(
+                        "warning",
+                        item.path,
+                        f"legacy {field} has no {profile_label} catalog",
+                    )
+                )
         return diagnostics
     for dimension, field in DIMENSION_FIELDS.items():
         configured = profile.dimensions.get(dimension)
@@ -428,22 +447,76 @@ def next_work_item_id(profile: Profile, highest_visible_sequence: int = 0) -> st
     return f"{profile.project_key}-{sequence + 1:05d}"
 
 
-def validate_workspace(root: Path) -> list[Diagnostic]:
-    root = root.resolve()
-    plans_root = root / "_notes" / "plans"
+def resolve_adapter_paths(
+    root: Path,
+    *,
+    plans_path: Path = DEFAULT_PLANS_PATH,
+    profile_path: Path = DEFAULT_PROFILE_PATH,
+) -> tuple[AdapterPaths | None, list[Diagnostic]]:
+    """Resolve configured adapter paths without allowing consumer-boundary escape."""
+    consumer_root = root.resolve()
+    resolved: dict[str, Path] = {}
+    diagnostics: list[Diagnostic] = []
+    for label, configured in (("plans", plans_path), ("profile", profile_path)):
+        candidate = Path(configured)
+        if candidate.is_absolute():
+            diagnostics.append(
+                Diagnostic("error", consumer_root, f"{label} path must be consumer-relative")
+            )
+            continue
+        target = (consumer_root / candidate).resolve()
+        try:
+            target.relative_to(consumer_root)
+        except ValueError:
+            diagnostics.append(
+                Diagnostic("error", consumer_root, f"{label} path escapes consumer root")
+            )
+            continue
+        resolved[label] = target
+    if diagnostics:
+        return None, diagnostics
+    return (
+        AdapterPaths(consumer_root, resolved["plans"], resolved["profile"]),
+        [],
+    )
+
+
+def validate_workspace(
+    root: Path,
+    *,
+    plans_path: Path = DEFAULT_PLANS_PATH,
+    profile_path: Path = DEFAULT_PROFILE_PATH,
+) -> list[Diagnostic]:
+    plans_label = Path(plans_path).as_posix()
+    profile_label = Path(profile_path).as_posix()
+    paths, diagnostics = resolve_adapter_paths(
+        root,
+        plans_path=plans_path,
+        profile_path=profile_path,
+    )
+    if paths is None:
+        return diagnostics
+    root = paths.consumer_root
+    plans_root = paths.plans_root
     diagnostics: list[Diagnostic] = []
     if not plans_root.is_dir():
-        return [Diagnostic("error", plans_root, "missing _notes/plans directory")]
-    profile_path = root / "_notes" / "GOVERNANCE.md"
+        return [Diagnostic("error", plans_root, f"missing {plans_label} directory")]
+    resolved_profile_path = paths.profile_path
     for legacy in (plans_root / "GOVERNANCE.md", plans_root / "PLANNING.md"):
         if legacy.exists():
-            diagnostics.append(Diagnostic("error", legacy, "legacy governance file must be moved to _notes/GOVERNANCE.md"))
+            diagnostics.append(
+                Diagnostic(
+                    "error",
+                    legacy,
+                    f"legacy governance file must be moved to {profile_label}",
+                )
+            )
     profile: Profile | None = None
-    if profile_path.exists():
-        profile, profile_diagnostics = parse_profile(profile_path)
+    if resolved_profile_path.exists():
+        profile, profile_diagnostics = parse_profile(resolved_profile_path)
         diagnostics.extend(profile_diagnostics)
         if profile and profile.schema_version == 3 and profile.last_work_item_sequence == 99999:
-            diagnostics.append(Diagnostic("warning", profile_path, "work-item sequence space is exhausted; define a later schema before creating more work"))
+            diagnostics.append(Diagnostic("warning", resolved_profile_path, "work-item sequence space is exhausted; define a later schema before creating more work"))
 
     current_paths: list[Path] = []
     for lifecycle in ("backlog", "ready", "active", "archived"):
@@ -458,7 +531,7 @@ def validate_workspace(root: Path) -> list[Diagnostic]:
         item, item_diagnostics = _work_item(path, plans_root, profile)
         items.append(item)
         diagnostics.extend(item_diagnostics)
-        diagnostics.extend(_validate_dimensions(item, profile))
+        diagnostics.extend(_validate_dimensions(item, profile, profile_label))
 
     by_id: dict[str, WorkItem] = {}
     for item in items:
@@ -543,8 +616,24 @@ def _print(diagnostics: Iterable[Diagnostic], base: Path) -> tuple[int, int]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", nargs="?", default=".", type=Path)
+    parser.add_argument(
+        "--plans-path",
+        default=DEFAULT_PLANS_PATH,
+        type=Path,
+        help="consumer-relative planning projection path",
+    )
+    parser.add_argument(
+        "--profile-path",
+        default=DEFAULT_PROFILE_PATH,
+        type=Path,
+        help="consumer-relative planning profile path",
+    )
     args = parser.parse_args(argv)
-    diagnostics = validate_workspace(args.root)
+    diagnostics = validate_workspace(
+        args.root,
+        plans_path=args.plans_path,
+        profile_path=args.profile_path,
+    )
     errors, _ = _print(diagnostics, args.root)
     return 1 if errors else 0
 

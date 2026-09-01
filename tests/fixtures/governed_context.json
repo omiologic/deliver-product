@@ -1,0 +1,26 @@
+[
+  {
+    "name": "governed context unavailable",
+    "owner_classification": "absent",
+    "expected_action": "proceed",
+    "expected_handling": "disclose-unavailable"
+  },
+  {
+    "name": "governed context applies",
+    "owner_classification": "applicable",
+    "expected_action": "proceed",
+    "expected_handling": "apply-with-provenance"
+  },
+  {
+    "name": "governed context conflicts",
+    "owner_classification": "conflicting",
+    "expected_action": "await-owner",
+    "expected_handling": "do-not-select-conflicting-context"
+  },
+  {
+    "name": "governed context blocks planning",
+    "owner_classification": "blocking",
+    "expected_action": "blocked",
+    "expected_handling": "do-not-produce-ready-work"
+  }
+]

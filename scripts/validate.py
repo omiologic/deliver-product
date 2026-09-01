@@ -29,6 +29,12 @@ ASSESSMENTS = (
 )
 LINK_PATTERN = re.compile(r"\[[^]]+\]\(([^)]+)\)")
 DEFAULT_PLANNING_TYPE = "bounded-outcome"
+GOVERNED_CONTEXT_RESPONSES = {
+    "absent": ("proceed", "disclose-unavailable"),
+    "applicable": ("proceed", "apply-with-provenance"),
+    "conflicting": ("await-owner", "do-not-select-conflicting-context"),
+    "blocking": ("blocked", "do-not-produce-ready-work"),
+}
 PLANNING_REFERENCES = (
     "references/planning-contract.md",
     "references/planning-type-routing.md",
@@ -90,6 +96,24 @@ def select_planning_type(
     if clear_inference:
         return normalize_planning_type(clear_inference), "clear-inference"
     return DEFAULT_PLANNING_TYPE, "default"
+
+
+def planning_response_to_governed_context(classification: str) -> tuple[str, str]:
+    """Model Planning's response to an owner-produced context classification."""
+    try:
+        return GOVERNED_CONTEXT_RESPONSES[classification]
+    except KeyError as exc:
+        raise ValueError(f"unsupported governed-context classification: {classification}") from exc
+
+
+def projection_persistence_allowed(
+    *,
+    adapter_selected: bool,
+    explicit_or_owner_produced_intent: bool,
+    filesystem_authority: bool,
+) -> bool:
+    """Model the three independent prerequisites for a planning projection write."""
+    return adapter_selected and explicit_or_owner_produced_intent and filesystem_authority
 
 
 def validate() -> list[str]:

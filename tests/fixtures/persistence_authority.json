@@ -1,0 +1,38 @@
+[
+  {
+    "name": "consumer convention alone grants no persistence",
+    "inputs": {
+      "adapter_selected": true,
+      "explicit_or_owner_produced_intent": false,
+      "filesystem_authority": true
+    },
+    "expected": false
+  },
+  {
+    "name": "intent without filesystem authority grants no persistence",
+    "inputs": {
+      "adapter_selected": true,
+      "explicit_or_owner_produced_intent": true,
+      "filesystem_authority": false
+    },
+    "expected": false
+  },
+  {
+    "name": "authority without adapter selection grants no persistence",
+    "inputs": {
+      "adapter_selected": false,
+      "explicit_or_owner_produced_intent": true,
+      "filesystem_authority": true
+    },
+    "expected": false
+  },
+  {
+    "name": "selected adapter with intent and authority permits persistence",
+    "inputs": {
+      "adapter_selected": true,
+      "explicit_or_owner_produced_intent": true,
+      "filesystem_authority": true
+    },
+    "expected": true
+  }
+]

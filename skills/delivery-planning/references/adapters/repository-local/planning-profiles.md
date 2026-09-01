@@ -1,6 +1,6 @@
 # Repository-local planning profiles
 
-`_notes/GOVERNANCE.md` may supply planning identity and organization for this compatibility adapter. Its presence does not select the adapter or grant persistence authority. Context Governance or another owner remains authoritative for governance-owned sections.
+The selected planning profile path, `_notes/GOVERNANCE.md` by default, may supply planning identity and organization for this compatibility adapter. Its presence does not select the adapter or grant persistence authority. Context Governance or another owner remains authoritative for governance-owned sections.
 
 The adapter supports schema versions 1, 2, and 3 from the legacy contract. Schema v3 planning fields are:
 

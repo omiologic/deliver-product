@@ -1,6 +1,6 @@
 # Repository-local work-item lifecycle
 
-The compatibility projection uses `backlog`, `ready`, `active`, and `archived` directories below `_notes/plans/`. `PLAN.md` is a navigational index, not a second status source. Compacted immutable records may live below `archived/history/<cycle-id>/` with one matching `archived/summaries/<cycle-id>.md` index entry.
+The compatibility projection uses `backlog`, `ready`, `active`, and `archived` directories below the selected planning root, `_notes/plans/` by default. `PLAN.md` is a navigational index, not a second status source. Compacted immutable records may live below `archived/history/<cycle-id>/` with one matching `archived/summaries/<cycle-id>.md` index entry.
 
 An item is locally ready only when every dependency is archived with a non-placeholder result other than cancellation or supersession. An item with no dependencies is ready immediately. Keep open items with missing, active, cancelled, superseded, or ambiguous dependencies in backlog. Never infer canonical readiness from this classification.
 

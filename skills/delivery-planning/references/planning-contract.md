@@ -25,6 +25,10 @@ Each WorkItem must represent one bounded result with explicit acceptance criteri
 
 Replanning begins from the reconciliation evidence. Identify the invalidated assumption, affected criteria, and smallest necessary scope change. Do not silently retry the same action, broaden scope, discard still-valid work, or replace canonical state.
 
+## Governed context
+
+Use applicability, conflict, and blocker classifications supplied by Context Governance or another owner; Planning does not infer or rank them. Apply applicable context with its provenance. If governed context is unavailable, proceed from explicit user and repository constraints and disclose the absence. If owner-produced context conflicts, do not select a rule or commit the affected scope; identify the conflict and request resolution from its owner. If an applicable constraint blocks the requested outcome, report the blocker without defining canonically ready or executable work.
+
 ## Persistence boundary
 
 Planning is advisory by default and requires no local files. Persist only when the user explicitly requests it or an owner-produced workflow requires it and the necessary filesystem authority exists. Use the consumer-selected adapter and resolve its paths relative to the consumer root. A stored artifact remains a projection and does not become canonical runtime state.
