@@ -24,7 +24,38 @@ Each installable package begins at its own repository directory:
 | `delivery-reconciliation` | `skills/delivery-reconciliation/` |
 | `delivery-spine` | `skills/delivery-spine/` |
 
-Install the five directories side by side through the consumer runtime's supported Skill installation mechanism for the expected Delivery ecosystem behavior. Preserve each package directory, including its `SKILL.md` and linked resources; the repository root is not an installable Skill.
+Install all five packages for Codex non-interactively with:
+
+```bash
+python3 scripts/install.py --target /path/to/consumer --agent codex --yes
+```
+
+Claude Code uses `--agent claude`. Omit `--yes` for an interactive confirmation. Install a subset by repeating `--package`, for example:
+
+```bash
+python3 scripts/install.py \
+  --target /path/to/consumer \
+  --agent codex \
+  --package deliver-product \
+  --package delivery-planning \
+  --yes
+```
+
+The installer fetches the configured remote and ref directly, installs metadata-free package snapshots under `.agents/skills/` for Codex or `.claude/skills/` for Claude Code, and records `.deliver-product-install.json` beside those package directories. Rerunning it reports each selected package as `current` or `behind`; upstream changes are not installed silently. An unmanaged copy, source change, or local modification requires `--migrate`. Differing paths are displayed before overwrite, and interactive migration requires explicit confirmation (`--yes` supplies that confirmation for agent-driven use).
+
+The shared manifest shape is:
+
+```json
+{
+  "commit": "<full source commit SHA>",
+  "source": "<source repository URL>",
+  "packages": {
+    "<package-name>": "<content_sha256>"
+  }
+}
+```
+
+Each digest covers the package-relative file paths and bytes. The manifest stays outside package directories, so installed package content remains identical to the source snapshot. The repository root is not an installable Skill.
 
 The packages remain independently installable so a consumer can load or invoke only the procedural context needed for a bounded task. However, a complete installation ensures that `deliver-product` can route across the full lifecycle, stage handoffs resolve consistently, reconciliation can return work to planning, and applicable cross-boundary delivery claims can use the Delivery Spine gates.
 
@@ -65,7 +96,7 @@ Validate the complete source workspace with `python3 scripts/validate.py`. Valid
 
 ## Status
 
-The repository contains the first contract scaffold for all four core skills and an aligned `delivery-spine` package. Delivery Planning provides thin planning-type routing, selectively loaded feature, sprint, research, and coordination procedures, and an optional consumer-relative repository-local adapter with bounded target, lifecycle, cycle, audit, and validation retrieval, dependency-free validation, and legacy `_notes/plans/**` defaults. Delivery Spine treats start and archive as read-only evidence gates and supports stable journey registration, current claims, compact baselines, archived claims, bounded retrieval, deterministic compact validation, explicit non-destructive migration from the schema-v1 monolith, and benchmark-gated input-only agent views. `scripts/validate.py` verifies package metadata, package-local links, planning compatibility resources, complete thin-router lifecycle composition, agent-view policy evidence, and public-safe behavioral scenarios for the Execution and Reconciliation contracts. Broader consumer integration, installation tooling, and migration from Context Governance remain future work.
+The repository contains the first contract scaffold for all four core skills and an aligned `delivery-spine` package. Delivery Planning provides thin planning-type routing, selectively loaded feature, sprint, research, and coordination procedures, and an optional consumer-relative repository-local adapter with bounded target, lifecycle, cycle, audit, and validation retrieval, dependency-free validation, and legacy `_notes/plans/**` defaults. Delivery Spine treats start and archive as read-only evidence gates and supports stable journey registration, current claims, compact baselines, archived claims, bounded retrieval, deterministic compact validation, explicit non-destructive migration from the schema-v1 monolith, and benchmark-gated input-only agent views. The pinned installer supports complete or selective ecosystem installation with source-commit provenance, per-package content digests, drift reporting, and guarded migration. `scripts/validate.py` verifies package metadata, package-local links, planning compatibility resources, complete thin-router lifecycle composition, agent-view policy evidence, and public-safe behavioral scenarios for the Execution and Reconciliation contracts. Broader consumer integration and migration from Context Governance remain future work.
 
 Delivery Spine is aligned with the repository's runtime-owner model: the consumer runtime or responsible person controls lifecycle transitions, System DevOps retains deployment and rollback authority, and gate success remains evidence rather than approval or completion.
 
